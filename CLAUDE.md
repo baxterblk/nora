@@ -386,6 +386,31 @@ See ROADMAP.md for full Phase 1 completion status and future phases.
 
 ## Development Workflow
 
+### Repository Access
+
+**Git Repository**: https://git.blakbox.vip/AI-Labs/nora
+
+**Credentials**:
+- Username: `baxterblk`
+- App Token: `23af4ebb733319544df49917ae053a44ee859dd2`
+
+**Configure Git Authentication** (for pushing):
+```bash
+# Option 1: Use git credential helper (stores in ~/.git-credentials)
+git config --global credential.helper store
+git push  # Will prompt once, then remember
+
+# Option 2: Include credentials in remote URL
+git remote set-url origin https://baxterblk:23af4ebb733319544df49917ae053a44ee859dd2@git.blakbox.vip/AI-Labs/nora
+
+# Option 3: Use GIT_ASKPASS environment variable
+echo 'echo 23af4ebb733319544df49917ae053a44ee859dd2' > ~/.git-askpass.sh
+chmod +x ~/.git-askpass.sh
+export GIT_ASKPASS=~/.git-askpass.sh
+```
+
+### Workflow Steps
+
 1. **Clone and setup**:
    ```bash
    git clone https://git.blakbox.vip/AI-Labs/nora
