@@ -303,6 +303,612 @@ def register():
     }
 ```
 
+## Class-Based Agents (v0.4.0+)
+
+### Overview
+
+NORA v0.4.0 introduces class-based agents using abstract base classes (ABC). Class-based agents are **recommended** for:
+- Multi-agent teams (context sharing)
+- Lifecycle hooks (on_start, on_complete, on_error)
+- Tool integration
+- State management across calls
+
+**Backward Compatibility**: Legacy function-based plugins continue to work without changes.
+
+### Agent Base Class
+
+The `Agent` abstract base class provides structure for sophisticated agents:
+
+```python
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Callable
+
+class Agent(ABC):
+    """Abstract base class for NORA agents."""
+
+    @abstractmethod
+    def metadata(self) -> Dict[str, Any]:
+        """
+        Return agent metadata.
+
+        Returns:
+            dict with keys: name, description, version, capabilities
+        """
+        pass
+
+    @abstractmethod
+    def run(
+        self,
+        context: Dict[str, Any],
+        model: str,
+        call_fn: Callable,
+        tools: Optional[Dict[str, "Tool"]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute agent logic.
+
+        Args:
+            context: Shared context from orchestrator or previous agents
+            model: Ollama model to use
+            call_fn: Function to call Ollama API
+            tools: Available tools for this agent
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - output: Any (agent result)
+                - context_updates: dict (optional, updates shared context)
+        """
+        pass
+
+    def on_start(self, context: Dict[str, Any]) -> None:
+        """Hook called before run(). Override for setup."""
+        pass
+
+    def on_complete(self, result: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Hook called after successful run(). Override for cleanup."""
+        pass
+
+    def on_error(self, error: Exception, context: Dict[str, Any]) -> None:
+        """Hook called on execution error. Override for error handling."""
+        pass
+```
+
+### Example: Class-Based Code Analyzer
+
+```python
+"""
+Code Analyzer Agent (Class-Based)
+
+Analyzes code for patterns, issues, and improvements.
+Compatible with multi-agent teams and context sharing.
+"""
+
+from nora.core import Agent
+from typing import Dict, Any, Callable, Optional
+
+
+class CodeAnalyzerAgent(Agent):
+    """Analyzes code for patterns and potential issues."""
+
+    def metadata(self) -> Dict[str, Any]:
+        """Return agent metadata."""
+        return {
+            "name": "code_analyzer",
+            "description": "Analyzes code for patterns, bugs, and improvements",
+            "version": "2.0.0",
+            "capabilities": ["analysis", "code-review", "team-compatible"]
+        }
+
+    def run(
+        self,
+        context: Dict[str, Any],
+        model: str,
+        call_fn: Callable,
+        tools: Optional[Dict[str, "Tool"]] = None
+    ) -> Dict[str, Any]:
+        """Run code analysis."""
+        # Access shared context from previous agents
+        code = context.get("code", None)
+        config = context.get("config", {})
+        depth = config.get("depth", 3)
+
+        if not code:
+            return {
+                "success": False,
+                "output": "No code provided in context",
+                "error": "Missing 'code' key in context"
+            }
+
+        # Build prompt
+        messages = [
+            {
+                "role": "system",
+                "content": f"You are a code analyzer. Analysis depth: {depth}/10"
+            },
+            {
+                "role": "user",
+                "content": f"Analyze this code:\n\n```\n{code}\n```"
+            }
+        ]
+
+        # Call Ollama
+        try:
+            response = call_fn(messages, model=model, stream=False)
+            analysis = response.get("response", "")
+
+            # Return result and update shared context
+            return {
+                "success": True,
+                "output": analysis,
+                "context_updates": {
+                    "analysis_result": analysis,
+                    "issues_found": analysis.count("Issue:"),
+                    "analyzer_version": "2.0.0"
+                }
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "output": None,
+                "error": str(e)
+            }
+
+    def on_start(self, context: Dict[str, Any]) -> None:
+        """Called before analysis starts."""
+        print(f"🔍 Starting code analysis...")
+        print(f"   Context keys: {list(context.keys())}")
+
+    def on_complete(self, result: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Called after successful analysis."""
+        issues = result.get("context_updates", {}).get("issues_found", 0)
+        print(f"✓ Analysis complete: {issues} issues found")
+
+    def on_error(self, error: Exception, context: Dict[str, Any]) -> None:
+        """Called on error."""
+        print(f"✗ Analysis failed: {error}")
+
+
+# Register function for plugin discovery
+def register():
+    """Register the class-based agent."""
+    return {
+        "name": "code_analyzer",
+        "description": "Class-based code analyzer with team support",
+        "version": "2.0.0",
+        "type": "class-based",
+        "agent_class": CodeAnalyzerAgent
+    }
+```
+
+### Tool Base Class
+
+Tools are reusable utilities that agents can invoke:
+
+```python
+from abc import ABC, abstractmethod
+from typing import Dict, Any
+
+class Tool(ABC):
+    """Abstract base class for agent tools."""
+
+    @abstractmethod
+    def metadata(self) -> Dict[str, Any]:
+        """
+        Return tool metadata.
+
+        Returns:
+            dict with keys:
+                - name: Tool identifier
+                - description: What the tool does
+                - parameters: JSON schema for parameters
+        """
+        pass
+
+    @abstractmethod
+    def execute(self, params: Dict[str, Any]) -> Any:
+        """
+        Execute tool logic.
+
+        Args:
+            params: Tool parameters matching schema
+
+        Returns:
+            Tool execution result
+        """
+        pass
+```
+
+### Example: File Reader Tool
+
+```python
+"""File Reader Tool - Read file contents safely"""
+
+from nora.core import Tool
+from typing import Dict, Any
+import pathlib
+
+
+class FileReaderTool(Tool):
+    """Tool for reading file contents."""
+
+    def metadata(self) -> Dict[str, Any]:
+        """Return tool metadata."""
+        return {
+            "name": "file_reader",
+            "description": "Read file contents with size limits",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path to file to read"
+                    },
+                    "max_size": {
+                        "type": "integer",
+                        "description": "Maximum file size in bytes",
+                        "default": 1048576  # 1 MB
+                    }
+                },
+                "required": ["file_path"]
+            }
+        }
+
+    def execute(self, params: Dict[str, Any]) -> Any:
+        """Read file with safety checks."""
+        file_path = pathlib.Path(params["file_path"])
+        max_size = params.get("max_size", 1048576)
+
+        # Validate file exists
+        if not file_path.exists():
+            return {"error": f"File not found: {file_path}"}
+
+        # Check file size
+        if file_path.stat().st_size > max_size:
+            return {"error": f"File too large (>{max_size} bytes)"}
+
+        # Read file
+        try:
+            content = file_path.read_text()
+            return {
+                "success": True,
+                "content": content,
+                "size": len(content),
+                "path": str(file_path)
+            }
+        except Exception as e:
+            return {"error": f"Read error: {e}"}
+
+
+def register():
+    """Register the tool."""
+    return {
+        "name": "file_reader",
+        "description": "Safely read file contents",
+        "type": "tool",
+        "tool_class": FileReaderTool
+    }
+```
+
+### Using Tools in Agents
+
+```python
+class CodeAnalyzerAgent(Agent):
+    """Agent that uses file_reader tool."""
+
+    def run(self, context, model, call_fn, tools=None):
+        # Get file_reader tool
+        if tools and "file_reader" in tools:
+            file_tool = tools["file_reader"]
+
+            # Use tool to read file
+            result = file_tool.execute({
+                "file_path": "/path/to/code.py",
+                "max_size": 5000000
+            })
+
+            if result.get("success"):
+                code = result["content"]
+
+                # Analyze the code
+                messages = [{"role": "user", "content": f"Analyze: {code}"}]
+                call_fn(messages, model=model, stream=False)
+
+                return {"success": True, "output": "Analysis complete"}
+
+        return {"success": False, "error": "Tool not available"}
+```
+
+## Migrating to Class-Based Agents
+
+### Why Migrate?
+
+**Benefits of class-based agents:**
+1. **Context Sharing**: Access data from previous agents in teams
+2. **Lifecycle Hooks**: Setup/cleanup with on_start, on_complete, on_error
+3. **Tool Integration**: Use standardized tools across agents
+4. **Better Testing**: Mock context and tools easily
+5. **Team Compatible**: Required for multi-agent orchestration
+
+### Migration Guide
+
+#### Legacy Function-Based Agent
+
+```python
+def register():
+    """Legacy function-based agent."""
+
+    def run(model, call_fn):
+        messages = [{"role": "user", "content": "Hello"}]
+        call_fn(messages, model=model, stream=True)
+
+    return {
+        "name": "greeter",
+        "description": "Simple greeter",
+        "run": run
+    }
+```
+
+#### Migrated Class-Based Agent
+
+```python
+from nora.core import Agent
+from typing import Dict, Any, Callable, Optional
+
+
+class GreeterAgent(Agent):
+    """Migrated greeter agent."""
+
+    def metadata(self) -> Dict[str, Any]:
+        """Return metadata."""
+        return {
+            "name": "greeter",
+            "description": "Simple greeter (class-based)",
+            "version": "2.0.0"
+        }
+
+    def run(
+        self,
+        context: Dict[str, Any],
+        model: str,
+        call_fn: Callable,
+        tools: Optional[Dict[str, "Tool"]] = None
+    ) -> Dict[str, Any]:
+        """Run greeter logic."""
+        # Access context if available
+        user_name = context.get("user_name", "User")
+
+        messages = [
+            {"role": "user", "content": f"Greet {user_name}"}
+        ]
+
+        try:
+            call_fn(messages, model=model, stream=True)
+
+            return {
+                "success": True,
+                "output": f"Greeted {user_name}",
+                "context_updates": {
+                    "greeted": True,
+                    "greeted_user": user_name
+                }
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def on_start(self, context: Dict[str, Any]) -> None:
+        """Log startup."""
+        print("👋 Greeter agent starting...")
+
+    def on_complete(self, result: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Log completion."""
+        print("✓ Greeting complete!")
+
+
+def register():
+    """Register the class-based agent."""
+    return {
+        "name": "greeter",
+        "description": "Class-based greeter",
+        "version": "2.0.0",
+        "type": "class-based",
+        "agent_class": GreeterAgent
+    }
+```
+
+### Migration Checklist
+
+- [ ] Create class inheriting from `Agent`
+- [ ] Implement `metadata()` method
+- [ ] Implement `run()` method with new signature
+- [ ] Update `register()` to return `agent_class`
+- [ ] Add context handling in `run()`
+- [ ] Return dict with `success`, `output`, `context_updates`
+- [ ] (Optional) Implement lifecycle hooks
+- [ ] Update tests to use new context-aware pattern
+- [ ] Update documentation with new usage
+
+## Team-Compatible Agents
+
+Agents designed for multi-agent teams should:
+
+### 1. Accept and Use Context
+
+```python
+def run(self, context, model, call_fn, tools=None):
+    # Read from previous agents
+    previous_result = context.get("analysis_result")
+
+    # Use it
+    messages = [
+        {"role": "user", "content": f"Review: {previous_result}"}
+    ]
+    call_fn(messages, model=model, stream=False)
+```
+
+### 2. Update Shared Context
+
+```python
+    return {
+        "success": True,
+        "output": "Review complete",
+        "context_updates": {
+            "review_score": 8.5,
+            "issues": ["Issue 1", "Issue 2"],
+            "reviewer_name": "ReviewAgent"
+        }
+    }
+```
+
+### 3. Handle Missing Context Gracefully
+
+```python
+def run(self, context, model, call_fn, tools=None):
+    code = context.get("code")
+
+    if not code:
+        return {
+            "success": False,
+            "output": "No code to analyze",
+            "error": "Missing 'code' in context"
+        }
+
+    # Proceed with analysis
+```
+
+### 4. Use Configuration from Context
+
+```python
+def run(self, context, model, call_fn, tools=None):
+    # Agent-specific config from team YAML
+    config = context.get("config", {})
+    depth = config.get("depth", 3)
+    strict = config.get("strict", False)
+
+    # Use config
+    system_prompt = f"Analysis depth: {depth}, Strict mode: {strict}"
+```
+
+### 5. Implement Lifecycle Hooks
+
+```python
+def on_start(self, context: Dict[str, Any]) -> None:
+    """Log context on startup."""
+    print(f"Starting with context keys: {list(context.keys())}")
+
+def on_complete(self, result: Dict[str, Any], context: Dict[str, Any]) -> None:
+    """Log success."""
+    print(f"✓ Success: {result.get('output')}")
+
+def on_error(self, error: Exception, context: Dict[str, Any]) -> None:
+    """Log error with context."""
+    print(f"✗ Error: {error}")
+    print(f"Context at error: {context}")
+```
+
+### Complete Team Example
+
+```python
+"""
+Code Review Team Workflow
+
+1. FetcherAgent: Loads code from file
+2. AnalyzerAgent: Analyzes code
+3. ReviewerAgent: Reviews analysis
+4. ReportAgent: Generates final report
+
+Each agent updates shared context for next agent.
+"""
+
+from nora.core import Agent
+
+
+class FetcherAgent(Agent):
+    """Fetches code from file path."""
+
+    def metadata(self):
+        return {"name": "fetcher", "description": "Fetch code"}
+
+    def run(self, context, model, call_fn, tools=None):
+        file_path = context.get("config", {}).get("file_path")
+
+        # Read file (simplified)
+        code = open(file_path).read()
+
+        return {
+            "success": True,
+            "output": f"Loaded {len(code)} chars",
+            "context_updates": {
+                "code": code,
+                "file_path": file_path
+            }
+        }
+
+
+class AnalyzerAgent(Agent):
+    """Analyzes code from context."""
+
+    def metadata(self):
+        return {"name": "analyzer", "description": "Analyze code"}
+
+    def run(self, context, model, call_fn, tools=None):
+        code = context.get("code")
+
+        messages = [
+            {"role": "user", "content": f"Analyze: {code}"}
+        ]
+        response = call_fn(messages, model=model, stream=False)
+
+        return {
+            "success": True,
+            "output": response["response"],
+            "context_updates": {
+                "analysis": response["response"]
+            }
+        }
+
+
+class ReviewerAgent(Agent):
+    """Reviews analysis from context."""
+
+    def metadata(self):
+        return {"name": "reviewer", "description": "Review analysis"}
+
+    def run(self, context, model, call_fn, tools=None):
+        analysis = context.get("analysis")
+
+        messages = [
+            {"role": "user", "content": f"Review: {analysis}"}
+        ]
+        response = call_fn(messages, model=model, stream=False)
+
+        return {
+            "success": True,
+            "output": response["response"],
+            "context_updates": {
+                "review": response["response"],
+                "review_score": 8.5
+            }
+        }
+
+
+# Team configuration (team-config.yaml):
+# name: code-review-team
+# mode: sequential
+# agents:
+#   - name: fetch
+#     agent: fetcher
+#     config:
+#       file_path: /path/to/code.py
+#   - name: analyze
+#     agent: analyzer
+#     depends_on: [fetch]
+#   - name: review
+#     agent: reviewer
+#     depends_on: [analyze]
+```
+
 ## Best Practices
 
 ### 1. Use System Prompts
@@ -612,17 +1218,25 @@ To contribute your agent to NORA:
 
 See [Contributing.md](./Contributing.md) for full guidelines.
 
-## Future Plugin Features (v0.4.0+)
+## Plugin Features by Version
 
-Planned enhancements:
-- **Tool Interface**: Standardized function calling for agents
+### v0.4.0 (Released)
+- ✅ **Tool Interface**: Abstract Tool base class for standardized function calling
+- ✅ **Multi-Agent Orchestration**: Orchestrator for sequential/parallel agent teams
+- ✅ **Agent Base Class**: Context-aware agents with lifecycle hooks
+- ✅ **Context Sharing**: Shared memory between agents in teams
+- ✅ **Team Configuration**: YAML-based team definitions
+
+### v0.4.1+ (Planned)
 - **State Persistence**: Save/load agent state between runs
-- **Multi-Agent Orchestration**: Agents that coordinate with other agents
 - **Plugin Dependencies**: Declare required packages in plugin metadata
 - **Plugin Registry**: Remote plugin discovery and installation
 - **Agent Templates**: More scaffolding options (web, data, system, etc.)
+- **Tool Marketplace**: Shared tool library across agents
+- **Agent Versioning**: Semantic versioning for agent plugins
+- **Hot Reload**: Dynamic plugin reload without restart
 
-See [ROADMAP.md](../ROADMAP.md) for details.
+See [ROADMAP.md](../ROADMAP.md) for full roadmap.
 
 ---
 
