@@ -103,15 +103,17 @@ class ProjectIndexer:
         self,
         project_path: str,
         project_name: Optional[str] = None,
-        max_file_size: int = 1024 * 1024  # 1MB
+        max_file_size: int = 1024 * 1024,  # 1MB
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
-        Index a project directory.
+        Index a project directory with optional caching.
 
         Args:
             project_path: Path to project root
             project_name: Optional project name (defaults to directory name)
             max_file_size: Maximum file size to index (bytes)
+            use_cache: If True, reuse cached file entries for unchanged files (faster)
 
         Returns:
             Index metadata dictionary
@@ -127,6 +129,22 @@ class ProjectIndexer:
             project_name = project_path.name
 
         logger.info(f"Indexing project: {project_name} at {project_path}")
+
+        # Load previous index for caching (if available)
+        cache = {}
+        cache_hits = 0
+        if use_cache:
+            try:
+                previous_index = self.load_index()
+                if previous_index and previous_index.get("project_path") == str(project_path):
+                    # Build cache: path -> file_entry
+                    for file_data in previous_index.get("files", []):
+                        rel_path = file_data.get("relative_path")
+                        if rel_path:
+                            cache[rel_path] = file_data
+                    logger.info(f"Loaded cache with {len(cache)} entries")
+            except Exception as e:
+                logger.debug(f"Could not load cache: {e}")
 
         # Scan files
         files: List[FileEntry] = []
@@ -147,8 +165,37 @@ class ProjectIndexer:
                 if ext not in self.INDEXED_EXTENSIONS:
                     continue
 
-                # Index file
-                entry = self._index_file(file_path, project_path)
+                # Check cache first (if enabled)
+                rel_path = str(file_path.relative_to(project_path))
+                cached_entry = None
+
+                if use_cache and rel_path in cache:
+                    # Fast check: compare modification time and size
+                    try:
+                        current_mtime = file_path.stat().st_mtime
+                        current_size = file_path.stat().st_size
+                        cached_size = cache[rel_path].get("size", 0)
+
+                        # If mtime and size match, file is very likely unchanged
+                        # Still compute hash for verification
+                        if current_size == cached_size:
+                            content = file_path.read_text(encoding="utf-8", errors="ignore")
+                            current_hash = hashlib.md5(content.encode()).hexdigest()
+                            cached_hash = cache[rel_path].get("file_hash")
+
+                            if current_hash == cached_hash:
+                                # File unchanged, reuse cached entry
+                                cached_entry = FileEntry(**cache[rel_path])
+                                cache_hits += 1
+                    except Exception:
+                        pass  # Fall through to re-index
+
+                # Index file (or use cached entry)
+                if cached_entry:
+                    entry = cached_entry
+                else:
+                    entry = self._index_file(file_path, project_path)
+
                 if entry:
                     files.append(entry)
                     total_size += size
@@ -156,6 +203,9 @@ class ProjectIndexer:
             except Exception as e:
                 logger.warning(f"Failed to index {file_path}: {e}")
                 skipped += 1
+
+        if use_cache and cache:
+            logger.info(f"Cache hits: {cache_hits}/{len(files)} files ({cache_hits * 100 // len(files) if files else 0}%)")
 
         # Create index metadata
         index_data = {
