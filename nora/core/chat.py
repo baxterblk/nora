@@ -94,9 +94,9 @@ class OllamaChat:
                         "stream": False
                     }
 
-                # Send test request with short timeout
-                # We accept any response that isn't connection failure or 404
-                r = requests.post(url, json=payload, timeout=3)
+                # Send test request with timeout
+                # Increased to 15s to handle slow Ollama servers
+                r = requests.post(url, json=payload, timeout=15)
 
                 # 404 means endpoint doesn't exist - try next candidate
                 # Any other status (even errors like 400/500) means endpoint exists
