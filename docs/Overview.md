@@ -120,6 +120,237 @@ Colored output and logging configuration:
 - **Connection Banner**: Startup status display
 - **Logging Setup**: Configure file/console handlers
 
+## v0.4.0 New Components
+
+### 7. Multi-Agent Orchestrator (`nora/core/orchestrator.py`)
+
+**NEW in v0.4.0**: Coordinates execution of multiple agents with shared memory and message passing.
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Orchestrator                         │
+│                                                         │
+│  ┌─────────────┐      ┌──────────────┐                │
+│  │  AgentTask  │──┬──→│ Sequential   │                │
+│  │   Queue     │  │   │  Executor    │                │
+│  └─────────────┘  │   └──────────────┘                │
+│                   │                                     │
+│                   └──→│  Parallel    │                │
+│                       │  Executor    │                │
+│                       └──────────────┘                │
+│                              │                          │
+│                              ▼                          │
+│                    ┌──────────────────┐                │
+│                    │  SharedMemory    │                │
+│                    │  - Key-Value     │                │
+│                    │  - Messages      │                │
+│                    └──────────────────┘                │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Key Classes:**
+- **Orchestrator**: Main coordination class
+  - `run_sequential(tasks)` - Execute agents in order
+  - `run_parallel(tasks)` - Execute with dependency resolution
+
+- **SharedMemory**: Thread-safe memory store
+  - `get(key)`, `set(key, value)` - Key-value storage
+  - `post_message(sender, message)` - Inter-agent messaging
+  - `get_messages()` - Consume pending messages
+
+- **AgentTask**: Represents a single agent in the workflow
+  - `agent_name`, `agent_instance`, `model`
+  - `depends_on` - List of dependencies
+  - `config` - Agent-specific configuration
+
+**Usage Example:**
+```python
+from nora.core.orchestrator import Orchestrator, AgentTask
+
+orchestrator = Orchestrator(model="deepseek-coder:6.7b", call_fn=chat_fn)
+
+tasks = [
+    AgentTask("analyzer", analyzer_agent, model),
+    AgentTask("reviewer", reviewer_agent, model, depends_on=["analyzer"]),
+]
+
+results = orchestrator.run_sequential(tasks)
+```
+
+### 8. Project Context Indexer (`nora/core/indexer.py`)
+
+**NEW in v0.4.0**: Indexes project directories for code-aware conversations.
+
+**Architecture:**
+```
+Project Directory
+      │
+      ├─> Walk Files (skip node_modules, __pycache__)
+      │
+      ├─> Extract Metadata
+      │   ├─ Language detection
+      │   ├─ Function/class extraction
+      │   ├─ Import statements
+      │   └─ Content preview
+      │
+      ├─> Generate Index
+      │   └─ ~/.nora/index.json
+      │
+      └─> Search & Context
+          ├─ Keyword search
+          ├─ Relevance scoring
+          └─ Chat context generation
+```
+
+**Key Features:**
+- Supports 20+ languages (Python, JS, TS, Go, Rust, Java, etc.)
+- Regex-based function/class extraction
+- MD5 hash for change detection
+- Thread-safe operations
+- Simple keyword search with scoring
+
+**Usage Example:**
+```python
+from nora.core.indexer import ProjectIndexer
+
+indexer = ProjectIndexer()
+index_data = indexer.index_project("./my-project")
+indexer.save_index(index_data)
+
+results = indexer.search("authentication", max_results=5)
+context = indexer.get_context_for_chat("login", max_files=3)
+```
+
+### 9. Agent/Tool Base Classes (`nora/core/plugins.py`)
+
+**NEW in v0.4.0**: Abstract base classes for class-based agents and tools.
+
+**Agent Base Class:**
+```python
+from nora.core import Agent
+
+class MyAgent(Agent):
+    def metadata(self):
+        return {
+            "name": "my-agent",
+            "description": "Custom agent",
+            "version": "1.0.0",
+            "capabilities": ["analysis", "generation"]
+        }
+
+    def run(self, context, model, call_fn, tools=None):
+        # Agent logic
+        return {"success": True, "output": "Result"}
+
+    def on_start(self, context):
+        # Optional: Called before run()
+        pass
+
+    def on_complete(self, result, context):
+        # Optional: Called after successful run()
+        pass
+
+    def on_error(self, error, context):
+        # Optional: Called on failure
+        pass
+```
+
+**Tool Base Class:**
+```python
+from nora.core import Tool
+
+class MyTool(Tool):
+    def metadata(self):
+        return {
+            "name": "read_file",
+            "description": "Read file content",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"}
+                },
+                "required": ["path"]
+            }
+        }
+
+    def execute(self, params):
+        path = params["path"]
+        return pathlib.Path(path).read_text()
+```
+
+### 10. REST API Server (`nora/api/server.py`)
+
+**NEW in v0.4.0**: FastAPI-based HTTP API for remote access.
+
+**Architecture:**
+```
+HTTP Client
+    │
+    ├─> POST /chat ──────────> OllamaChat ──> Ollama
+    │
+    ├─> GET /agents ─────────> PluginLoader
+    │
+    ├─> POST /agents/{name} ─> PluginLoader.run_plugin()
+    │
+    ├─> POST /projects/index > ProjectIndexer.index_project()
+    │
+    ├─> POST /projects/search > ProjectIndexer.search()
+    │
+    └─> POST /team ──────────> Orchestrator ──> Multi-Agent Execution
+```
+
+**Endpoints:**
+- `GET /` - API info and endpoints list
+- `POST /chat` - Send chat messages (streaming support)
+- `GET /agents` - List all available agents
+- `POST /agents/{name}` - Execute specific agent
+- `POST /projects/index` - Index a project directory
+- `POST /projects/search` - Search indexed projects
+- `POST /team` - Run multi-agent teams
+
+**Usage Example:**
+```bash
+# Start API server
+nora serve --host 0.0.0.0 --port 8001
+
+# Make requests
+curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+## Complete System Architecture (v0.4.0)
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                        NORA v0.4.0                             │
+│                                                                │
+│  ┌──────────┐           ┌──────────┐          ┌──────────┐   │
+│  │   CLI    │           │   REST   │          │  Python  │   │
+│  │ Commands │           │   API    │          │  Import  │   │
+│  └────┬─────┘           └────┬─────┘          └────┬─────┘   │
+│       │                      │                     │          │
+│       └──────────────────────┴─────────────────────┘          │
+│                              │                                │
+│       ┌──────────────────────┴──────────────────────┐         │
+│       │            Core Components                   │         │
+│       │  - ConfigManager    - PluginLoader          │         │
+│       │  - HistoryManager   - OllamaChat            │         │
+│       │  - Orchestrator     - ProjectIndexer        │         │
+│       └──────────────────────┬──────────────────────┘         │
+│                              │                                │
+│       ┌──────────────────────┴──────────────────────┐         │
+│       │         External Services                    │         │
+│       │  - Ollama API (localhost:11434)             │         │
+│       │  - User Plugins (nora/plugins/*.py)         │         │
+│       │  - Project Files (for indexing)             │         │
+│       └─────────────────────────────────────────────┘         │
+│                                                                │
+│  Storage: ~/.nora/config.yaml, history.json, index.json       │
+└────────────────────────────────────────────────────────────────┘
+```
+
 ## CLI Command Flow
 
 ### `nora chat`
