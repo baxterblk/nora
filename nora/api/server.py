@@ -130,7 +130,10 @@ class NoraAPIServer:
         self.plugins = self.plugin_loader.load_plugins()
         self.indexer = ProjectIndexer()
         compatibility_mode = config.get("ollama.compatibility", "chat")
+        # Normalize endpoint: treat "null" string as None for auto-detection
         endpoint = config.get("ollama.endpoint", None)
+        if endpoint == "null":
+            endpoint = None
         self.chat_client = OllamaChat(
             base_url=config.get_ollama_url(),
             model=config.get_model(),

@@ -23,6 +23,21 @@ from .core import utils
 logger = logging.getLogger(__name__)
 
 
+def normalize_endpoint(endpoint: Optional[str]) -> Optional[str]:
+    """
+    Normalize endpoint value, treating "null" string as None.
+
+    Args:
+        endpoint: Endpoint value from config (may be None or "null" string)
+
+    Returns:
+        None if endpoint is None or "null" string, otherwise the endpoint value
+    """
+    if endpoint == "null" or endpoint is None:
+        return None
+    return endpoint
+
+
 def chat_loop(
     config: ConfigManager,
     history_manager: HistoryManager,
@@ -45,7 +60,7 @@ def chat_loop(
 
     # Get compatibility mode and endpoint (default to "chat" and None for auto-detect)
     compatibility_mode = config.get("ollama.compatibility", "chat")
-    endpoint = config.get("ollama.endpoint", None)
+    endpoint = normalize_endpoint(config.get("ollama.endpoint", None))
 
     # Initialize chat client
     chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
@@ -133,7 +148,7 @@ def run_one_shot(
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
     compatibility_mode = config.get("ollama.compatibility", "chat")
-    endpoint = config.get("ollama.endpoint", None)
+    endpoint = normalize_endpoint(config.get("ollama.endpoint", None))
 
     chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
 
@@ -210,7 +225,7 @@ def run_agent(
 
     # Create chat function for the agent
     compatibility_mode = config.get("ollama.compatibility", "chat")
-    endpoint = config.get("ollama.endpoint", None)
+    endpoint = normalize_endpoint(config.get("ollama.endpoint", None))
     chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
 
     # Auto-detect and save endpoint if needed
@@ -350,7 +365,7 @@ def run_team(config: ConfigManager, team_config_path: str, plugin_loader: Plugin
         # Create orchestrator
         model = team_config.get("model", config.get_model())
         compatibility_mode = config.get("ollama.compatibility", "chat")
-        endpoint = config.get("ollama.endpoint", None)
+        endpoint = normalize_endpoint(config.get("ollama.endpoint", None))
         chat_client = OllamaChat(config.get_ollama_url(), model, compatibility_mode=compatibility_mode, endpoint=endpoint)
 
         # Auto-detect and save endpoint if needed

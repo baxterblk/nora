@@ -70,13 +70,30 @@ class ConfigManager:
 
         Args:
             key_path: Dot-separated path to the key (e.g., "ollama.url")
-            value: Value to set
+            value: Value to set (use "null" or None to delete the key)
 
         Example:
             config.set("ollama.url", "http://remote:11434")
+            config.set("ollama.endpoint", "null")  # Deletes the key
         """
         keys = key_path.split(".")
         d = self.config
+
+        # Handle "null" string or None as deletion request
+        if value == "null" or value is None:
+            # Navigate to parent dict
+            for k in keys[:-1]:
+                if k not in d or not isinstance(d[k], dict):
+                    return  # Key doesn't exist, nothing to delete
+                d = d[k]
+            # Delete the final key if it exists
+            if keys[-1] in d:
+                del d[keys[-1]]
+                self.save()
+                logger.info(f"Deleted config {key_path}")
+            return
+
+        # Normal set operation
         for k in keys[:-1]:
             d = d.setdefault(k, {})
         d[keys[-1]] = value
