@@ -138,7 +138,7 @@ class NoraAPIServer:
         self.app = FastAPI(
             title="NORA API",
             description="REST API for NORA - No Rush on Anything",
-            version="0.4.0",
+            version="0.4.1-beta",
             lifespan=self.lifespan
         )
 
@@ -162,7 +162,7 @@ class NoraAPIServer:
             """API root endpoint."""
             return {
                 "name": "NORA API",
-                "version": "0.4.0",
+                "version": "0.4.1-beta",
                 "endpoints": [
                     "/chat",
                     "/agents",

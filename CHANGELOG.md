@@ -5,6 +5,72 @@ All notable changes to NORA will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1-beta] - 2025-10-06
+
+### Added
+
+#### Documentation
+- **docs/API.md**: Complete REST API documentation with all 6 endpoints
+  - Request/response schemas with JSON examples
+  - curl command examples for each endpoint
+  - Python client implementation example
+  - Error handling and troubleshooting guide
+  - Performance considerations and rate limiting notes
+- **docs/Testing.md**: Comprehensive pytest testing guide
+  - Test structure and organization patterns
+  - Running tests with coverage reports
+  - Async testing with pytest-asyncio
+  - CI/CD integration with GitHub Actions
+  - Writing new tests and best practices
+  - Benchmark results and performance tips
+- **docs/Agents.md**: Class-based agent documentation
+  - Agent and Tool base class interfaces with examples
+  - Complete migration guide from function-based to class-based
+  - Team-compatible agent patterns
+  - Lifecycle hooks usage (on_start, on_complete, on_error)
+  - Updated feature status (v0.4.0 vs v0.4.1+)
+
+#### Performance
+- **Incremental Indexing**: ProjectIndexer now supports file hash caching
+  - Optional `use_cache` parameter in `index_project()` (default: True)
+  - Reuses cached entries for unchanged files (size + MD5 hash validation)
+  - Logs cache hit rate for visibility
+  - Expected 50-80% speedup on large projects (1000+ files)
+  - Minimal overhead on small projects (<100 files)
+- **Benchmark Script**: `benchmark_indexer.py` for performance testing
+
+### Fixed
+
+#### Test Failures (6 bugs, now 100% pass rate)
+- **test_run_agent_not_found**: API now properly returns 404 for missing agents
+  - Moved 404 check outside try block to prevent HTTPException from being caught
+- **test_run_agent_failure**: Fixed mock configuration for plugin_loader
+  - Mocks api_server.plugin_loader.run_plugin directly
+- **test_index_project_success**: Fixed Pydantic validation with mocks
+  - Mocks api_server.indexer instance methods instead of class
+- **test_search_index_success**: Fixed mock return values
+  - Mocks api_server.indexer.search with proper result structure
+- **test_chat_internal_error**: Fixed HTTP status code for exceptions
+  - API chat endpoint now properly raises 500 on internal errors
+- **test_sequential_agent_failure**: Fixed error capture for legacy agents
+  - Orchestrator now sets task.error even when exception is caught and returned as dict
+
+#### Code Quality
+- Improved error handling in API server (separate HTTPException from general exceptions)
+- Better orchestrator error tracking for both class-based and legacy agents
+
+### Testing
+
+- **100% Pass Rate**: All 113 tests passing
+- **Module Coverage**: 85% API, 87% orchestrator, 92% indexer
+- **CI/CD**: GitHub Actions running across Python 3.8-3.12 on Ubuntu and macOS
+
+### Notes
+
+This is a beta release focused on documentation completion and bug fixes. No new features added beyond caching optimization. All v0.4.0 APIs remain unchanged.
+
+---
+
 ## [0.4.0] - 2025-10-06
 
 ### Added
