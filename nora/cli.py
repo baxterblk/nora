@@ -43,14 +43,22 @@ def chat_loop(
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
 
-    # Show connection banner
-    utils.connection_banner(ollama_url, model)
-
-    # Get compatibility mode (default to "chat")
+    # Get compatibility mode and endpoint (default to "chat" and None for auto-detect)
     compatibility_mode = config.get("ollama.compatibility", "chat")
+    endpoint = config.get("ollama.endpoint", None)
 
     # Initialize chat client
-    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
+
+    # Trigger endpoint detection if not manually set
+    if not endpoint:
+        detected = chat_client.get_endpoint()
+        if detected and detected != endpoint:
+            config.set("ollama.endpoint", detected)
+            logger.info(f"Auto-detected and saved endpoint: {detected}")
+
+    # Show connection banner with detected endpoint
+    utils.connection_banner(ollama_url, model, endpoint=chat_client.get_endpoint())
 
     # Load history
     history = history_manager.load()
@@ -125,8 +133,15 @@ def run_one_shot(
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
     compatibility_mode = config.get("ollama.compatibility", "chat")
+    endpoint = config.get("ollama.endpoint", None)
 
-    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
+
+    # Auto-detect and save endpoint if needed
+    if not endpoint:
+        detected = chat_client.get_endpoint()
+        if detected:
+            config.set("ollama.endpoint", detected)
 
     messages = []
 
@@ -195,7 +210,14 @@ def run_agent(
 
     # Create chat function for the agent
     compatibility_mode = config.get("ollama.compatibility", "chat")
-    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
+    endpoint = config.get("ollama.endpoint", None)
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint)
+
+    # Auto-detect and save endpoint if needed
+    if not endpoint:
+        detected = chat_client.get_endpoint()
+        if detected:
+            config.set("ollama.endpoint", detected)
 
     def agent_chat(messages, model=model, stream=False):
         chat_client.chat(messages, model=model, stream=stream)
@@ -328,7 +350,14 @@ def run_team(config: ConfigManager, team_config_path: str, plugin_loader: Plugin
         # Create orchestrator
         model = team_config.get("model", config.get_model())
         compatibility_mode = config.get("ollama.compatibility", "chat")
-        chat_client = OllamaChat(config.get_ollama_url(), model, compatibility_mode=compatibility_mode)
+        endpoint = config.get("ollama.endpoint", None)
+        chat_client = OllamaChat(config.get_ollama_url(), model, compatibility_mode=compatibility_mode, endpoint=endpoint)
+
+        # Auto-detect and save endpoint if needed
+        if not endpoint:
+            detected = chat_client.get_endpoint()
+            if detected:
+                config.set("ollama.endpoint", detected)
 
         orchestrator = Orchestrator(
             model=model,

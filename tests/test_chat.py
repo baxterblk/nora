@@ -55,7 +55,8 @@ class TestOllamaChat:
     @patch('requests.post')
     def test_generate_endpoint_non_streaming(self, mock_post):
         """Test /api/generate endpoint without streaming"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="generate")
+        # Explicitly set endpoint to /api/generate
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/generate")
 
         # Mock successful response
         mock_response = Mock()
@@ -79,107 +80,95 @@ class TestOllamaChat:
         # Check that messages were converted to prompt
         assert "prompt" in call_args[1]["json"]
 
-    @patch('requests.post')
-    def test_404_fallback_to_generate(self, mock_post):
-        """Test automatic fallback from /api/chat to /api/generate on 404"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="chat")
+    @patch('requests.get')
+    def test_endpoint_detection(self, mock_get):
+        """Test automatic endpoint detection"""
+        chat = OllamaChat("http://localhost:11434", "test-model")
 
-        # First call: /api/chat returns 404
-        mock_404_response = Mock()
-        mock_404_response.status_code = 404
-        mock_404_response.raise_for_status.side_effect = requests.HTTPError(response=mock_404_response)
-        mock_404_response.__enter__ = Mock(return_value=mock_404_response)
-        mock_404_response.__exit__ = Mock(return_value=False)
+        # Mock /api/chat as available (returns 200)
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
 
-        # Second call: /api/generate succeeds
-        mock_success_response = Mock()
-        mock_success_response.json.return_value = {
-            "response": "Fallback response",
-            "done": True
-        }
-        mock_success_response.__enter__ = Mock(return_value=mock_success_response)
-        mock_success_response.__exit__ = Mock(return_value=False)
+        # Detect endpoint
+        detected = chat.detect_endpoint()
 
-        # Set up mock to return 404 first, then success
-        mock_post.side_effect = [mock_404_response, mock_success_response]
+        assert detected == "/api/chat"
+        assert chat._detected_endpoint == "/api/chat"
+        # Should have tried /api/chat first
+        assert mock_get.call_count >= 1
+        assert mock_get.call_args_list[0][0][0] == "http://localhost:11434/api/chat"
 
-        messages = [{"role": "user", "content": "Test message"}]
+    @patch('requests.get')
+    def test_endpoint_detection_fallback(self, mock_get):
+        """Test endpoint detection with fallback to /api/generate"""
+        chat = OllamaChat("http://localhost:11434", "test-model")
 
-        with patch('builtins.print') as mock_print:
-            with patch('nora.core.utils.warning') as mock_warning:
-                result = chat.chat(messages, stream=False)
+        # Mock responses: /api/chat fails, /api/generate succeeds
+        def side_effect(*args, **kwargs):
+            url = args[0]
+            if "/api/chat" in url:
+                raise requests.RequestException("404")
+            elif "/api/generate" in url:
+                mock_resp = Mock()
+                mock_resp.status_code = 200
+                return mock_resp
+            raise requests.RequestException("Not found")
 
-        # Verify fallback occurred
-        assert result["response"] == "Fallback response"
-        assert mock_post.call_count == 2
+        mock_get.side_effect = side_effect
 
-        # Check first call was /api/chat
-        first_call = mock_post.call_args_list[0]
-        assert first_call[0][0] == "http://localhost:11434/api/chat"
+        # Detect endpoint
+        detected = chat.detect_endpoint()
 
-        # Check second call was /api/generate
-        second_call = mock_post.call_args_list[1]
-        assert second_call[0][0] == "http://localhost:11434/api/generate"
+        assert detected == "/api/generate"
+        assert chat._detected_endpoint == "/api/generate"
 
-        # Verify warning was issued
-        assert mock_warning.call_count == 2  # Two warning messages
-        warning_messages = [call[0][0] for call in mock_warning.call_args_list]
-        assert any("/api/chat" in msg for msg in warning_messages)
-        assert any("nora config set" in msg for msg in warning_messages)
+    @patch('requests.get')
+    def test_endpoint_detection_open_webui(self, mock_get):
+        """Test endpoint detection with Open-WebUI (/api/v1/generate)"""
+        chat = OllamaChat("http://localhost:11434", "test-model")
 
-    @patch('requests.post')
-    def test_404_fallback_warns_only_once(self, mock_post):
-        """Test that 404 fallback warning appears only once per session"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="chat")
+        # Mock responses: first two fail, /api/v1/generate succeeds
+        def side_effect(*args, **kwargs):
+            url = args[0]
+            if "/api/v1/generate" in url:
+                mock_resp = Mock()
+                mock_resp.status_code = 200
+                return mock_resp
+            raise requests.RequestException("Not found")
 
-        # Mock 404 response
-        mock_404_response = Mock()
-        mock_404_response.status_code = 404
-        mock_404_response.raise_for_status.side_effect = requests.HTTPError(response=mock_404_response)
-        mock_404_response.__enter__ = Mock(return_value=mock_404_response)
-        mock_404_response.__exit__ = Mock(return_value=False)
+        mock_get.side_effect = side_effect
 
-        # Mock success response
-        mock_success_response = Mock()
-        mock_success_response.json.return_value = {
-            "response": "Fallback response",
-            "done": True
-        }
-        mock_success_response.__enter__ = Mock(return_value=mock_success_response)
-        mock_success_response.__exit__ = Mock(return_value=False)
+        # Detect endpoint
+        detected = chat.detect_endpoint()
 
-        # Both calls trigger 404 then success
-        mock_post.side_effect = [
-            mock_404_response, mock_success_response,  # First chat call
-            mock_404_response, mock_success_response   # Second chat call
-        ]
+        assert detected == "/api/v1/generate"
+        assert chat._detected_endpoint == "/api/v1/generate"
 
-        messages = [{"role": "user", "content": "Test message"}]
+    def test_manual_endpoint_override(self):
+        """Test that manual endpoint setting bypasses detection"""
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/custom/endpoint")
 
-        with patch('builtins.print'):
-            with patch('nora.core.utils.warning') as mock_warning:
-                # First chat call - should warn
-                chat.chat(messages, stream=False)
-                first_warning_count = mock_warning.call_count
+        # get_endpoint should return manual override without detection
+        endpoint = chat.get_endpoint()
 
-                # Reset mock to count new warnings
-                mock_warning.reset_mock()
+        assert endpoint == "/custom/endpoint"
+        assert chat._detected_endpoint is None  # No detection should have happened
 
-                # Second chat call - should NOT warn again
-                chat.chat(messages, stream=False)
-                second_warning_count = mock_warning.call_count
+    def test_endpoint_caching(self):
+        """Test that endpoint detection is cached"""
+        chat = OllamaChat("http://localhost:11434", "test-model")
+        chat._detected_endpoint = "/cached/endpoint"
 
-        # First call should have warnings
-        assert first_warning_count == 2
-        # Second call should have no warnings
-        assert second_warning_count == 0
-        # Verify _fallback_warned flag was set
-        assert chat._fallback_warned is True
+        # Should return cached value without re-detection
+        endpoint = chat.get_endpoint()
+
+        assert endpoint == "/cached/endpoint"
 
     @patch('requests.post')
     def test_non_404_error_propagates(self, mock_post):
-        """Test that non-404 errors are not caught by fallback"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="chat")
+        """Test that errors propagate correctly"""
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/chat")
 
         # Mock 500 error response
         mock_500_response = Mock()
@@ -191,13 +180,14 @@ class TestOllamaChat:
 
         messages = [{"role": "user", "content": "Test message"}]
 
-        # Should raise HTTPError, not fallback
+        # Should raise HTTPError
         with pytest.raises(requests.HTTPError):
             chat.chat(messages, stream=False)
 
     def test_message_to_prompt_conversion(self):
         """Test that messages are correctly converted to prompt format"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="generate")
+        # Explicitly set endpoint to /api/generate
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/generate")
 
         messages = [
             {"role": "system", "content": "You are a helpful assistant"},
@@ -229,7 +219,7 @@ class TestOllamaChat:
     @patch('requests.post')
     def test_streaming_chat_endpoint(self, mock_post):
         """Test streaming with /api/chat endpoint"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="chat")
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/chat")
 
         # Mock streaming response
         mock_response = Mock()
@@ -256,7 +246,7 @@ class TestOllamaChat:
     @patch('requests.post')
     def test_streaming_generate_endpoint(self, mock_post):
         """Test streaming with /api/generate endpoint"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="generate")
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/generate")
 
         # Mock streaming response
         mock_response = Mock()

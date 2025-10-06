@@ -93,7 +93,7 @@ class TestAPIRoot:
         data = response.json()
 
         assert data["name"] == "NORA API"
-        assert data["version"] == "0.4.1-beta1"
+        assert data["version"] == "0.4.1-beta2"
         assert "endpoints" in data
         assert isinstance(data["endpoints"], list)
 

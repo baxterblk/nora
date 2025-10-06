@@ -19,7 +19,21 @@ MAX_FILE_TOKENS = 2000
 class OllamaChat:
     """Manages Ollama API chat interactions with streaming support and compatibility."""
 
-    def __init__(self, base_url: str, model: str, compatibility_mode: str = "chat") -> None:
+    # Candidate endpoints to probe during auto-detection
+    ENDPOINT_CANDIDATES = [
+        "/api/chat",           # Native Ollama v0.3.9+
+        "/api/generate",       # Native Ollama < v0.3.9
+        "/api/v1/generate",    # Open-WebUI
+        "/v1/chat/completions" # OpenAI-compatible proxies
+    ]
+
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        compatibility_mode: str = "chat",
+        endpoint: Optional[str] = None
+    ) -> None:
         """
         Initialize the Ollama chat client.
 
@@ -29,12 +43,68 @@ class OllamaChat:
             compatibility_mode: API endpoint mode - "chat" (default) or "generate"
                               - "chat": Use /api/chat (Ollama v0.3.9+)
                               - "generate": Use /api/generate (Ollama < v0.3.9)
+            endpoint: Explicit endpoint path (e.g., "/api/chat"). If None, will auto-detect.
         """
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.compatibility_mode = compatibility_mode
+        self.endpoint = endpoint  # Manual override or None for auto-detect
+        self._detected_endpoint: Optional[str] = None  # Cached detection result
         self._fallback_warned = False  # Track if we've warned about fallback
-        logger.debug(f"OllamaChat initialized with {base_url}, model: {model}, mode: {compatibility_mode}")
+        logger.debug(
+            f"OllamaChat initialized with {base_url}, model: {model}, "
+            f"mode: {compatibility_mode}, endpoint: {endpoint or 'auto-detect'}"
+        )
+
+    def detect_endpoint(self) -> Optional[str]:
+        """
+        Auto-detect the correct API endpoint by probing candidates.
+
+        Tries multiple endpoint paths in order and returns the first one that responds.
+        Caches the result to avoid repeated detection.
+
+        Returns:
+            Detected endpoint path or None if all candidates fail
+        """
+        if self._detected_endpoint:
+            return self._detected_endpoint
+
+        logger.info("Auto-detecting API endpoint...")
+
+        for candidate in self.ENDPOINT_CANDIDATES:
+            url = f"{self.base_url}{candidate}"
+            try:
+                # Use HEAD or GET with short timeout to check endpoint existence
+                # Status codes 200, 400, 405 indicate the endpoint exists
+                r = requests.get(url, timeout=2)
+                if r.status_code in (200, 400, 405):
+                    self._detected_endpoint = candidate
+                    logger.info(f"Detected endpoint: {candidate}")
+                    return candidate
+            except requests.RequestException as e:
+                logger.debug(f"Endpoint {candidate} failed: {e}")
+                continue
+
+        logger.warning("No valid endpoint detected, falling back to /api/chat")
+        self._detected_endpoint = "/api/chat"
+        return self._detected_endpoint
+
+    def get_endpoint(self) -> str:
+        """
+        Get the endpoint to use for requests.
+
+        Returns explicit endpoint if set, otherwise performs auto-detection.
+
+        Returns:
+            Endpoint path to use
+        """
+        if self.endpoint:
+            return self.endpoint
+
+        if self._detected_endpoint:
+            return self._detected_endpoint
+
+        return self.detect_endpoint() or "/api/chat"
 
     def chat(
         self,
@@ -43,7 +113,7 @@ class OllamaChat:
         stream: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        Send a chat request to Ollama API with automatic fallback.
+        Send a chat request to Ollama API with automatic endpoint detection.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content'
@@ -58,44 +128,37 @@ class OllamaChat:
         """
         model = model or self.model
 
-        # Try /api/chat first if in chat mode
-        if self.compatibility_mode == "chat":
-            try:
-                return self._chat_endpoint(messages, model, stream)
-            except requests.HTTPError as e:
-                # If 404, try fallback to /api/generate
-                if e.response.status_code == 404:
-                    if not self._fallback_warned:
-                        from nora.core.utils import warning
-                        warning("Ollama server missing /api/chat — falling back to /api/generate compatibility mode.")
-                        warning("Consider upgrading Ollama or run: nora config set ollama.compatibility generate")
-                        self._fallback_warned = True
-                    logger.info("Falling back to /api/generate")
-                    return self._generate_endpoint(messages, model, stream)
-                else:
-                    raise
+        # Get the endpoint to use (manual override, cached detection, or auto-detect)
+        endpoint_path = self.get_endpoint()
+
+        # Determine if this is a chat-style or generate-style endpoint
+        is_chat_style = "chat" in endpoint_path or "completions" in endpoint_path
+
+        if is_chat_style:
+            return self._chat_endpoint(messages, model, stream, endpoint_path)
         else:
-            # Use /api/generate directly
-            return self._generate_endpoint(messages, model, stream)
+            return self._generate_endpoint(messages, model, stream, endpoint_path)
 
     def _chat_endpoint(
         self,
         messages: List[Dict[str, str]],
         model: str,
-        stream: bool
+        stream: bool,
+        endpoint_path: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Use /api/chat endpoint (Ollama v0.3.9+).
+        Use chat-style endpoint (Ollama /api/chat or OpenAI-compatible).
 
         Args:
             messages: List of message dictionaries
             model: Model to use
             stream: Whether to stream
+            endpoint_path: The endpoint path to use
 
         Returns:
             Response dictionary for non-streaming, None for streaming
         """
-        url = f"{self.base_url}/api/chat"
+        url = f"{self.base_url}{endpoint_path}"
         payload = {"model": model, "messages": messages, "stream": stream}
 
         logger.debug(f"Sending chat request to {url} with {len(messages)} messages")
@@ -108,27 +171,33 @@ class OllamaChat:
                 return None
             else:
                 data = resp.json()
-                print(data["message"]["content"])
+                # Handle both Ollama and OpenAI-style responses
+                if "message" in data:
+                    print(data["message"]["content"])
+                elif "choices" in data:
+                    print(data["choices"][0]["message"]["content"])
                 return data
 
     def _generate_endpoint(
         self,
         messages: List[Dict[str, str]],
         model: str,
-        stream: bool
+        stream: bool,
+        endpoint_path: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Use /api/generate endpoint (Ollama < v0.3.9).
+        Use generate-style endpoint (Ollama /api/generate or Open-WebUI /api/v1/generate).
 
         Args:
             messages: List of message dictionaries
             model: Model to use
             stream: Whether to stream
+            endpoint_path: The endpoint path to use
 
         Returns:
             Response dictionary for non-streaming, None for streaming
         """
-        url = f"{self.base_url}/api/generate"
+        url = f"{self.base_url}{endpoint_path}"
 
         # Convert messages to prompt format
         # Concatenate all user messages and system prompts
@@ -146,7 +215,7 @@ class OllamaChat:
         prompt = "\n\n".join(prompt_parts)
         payload = {"model": model, "prompt": prompt, "stream": stream}
 
-        logger.debug(f"Sending generate request to {url} (compatibility mode)")
+        logger.debug(f"Sending generate request to {url}")
 
         with requests.post(url, json=payload, stream=stream, timeout=120) as resp:
             resp.raise_for_status()

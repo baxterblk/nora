@@ -121,7 +121,12 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
         root_logger.addHandler(file_handler)
 
 
-def connection_banner(url: str, model: str, status: str = "Connected") -> None:
+def connection_banner(
+    url: str,
+    model: str,
+    status: str = "Connected",
+    endpoint: Optional[str] = None
+) -> None:
     """
     Display a connection status banner.
 
@@ -129,13 +134,21 @@ def connection_banner(url: str, model: str, status: str = "Connected") -> None:
         url: Ollama API URL
         model: Model name
         status: Connection status
+        endpoint: API endpoint path (optional)
     """
     status_color = Colors.GREEN if status == "Connected" else Colors.RED
     print(colored("─" * 70, Colors.BLUE))
-    print(
-        colored("NORA", Colors.CYAN, bold=True) + " | " +
-        colored(f"{status}", status_color, bold=True) + " | " +
-        colored(f"{url}", Colors.WHITE) + " | " +
-        colored(f"Model: {model}", Colors.YELLOW)
-    )
+
+    banner_parts = [
+        colored("NORA", Colors.CYAN, bold=True),
+        colored(f"{status}", status_color, bold=True),
+        colored(f"{url}", Colors.WHITE)
+    ]
+
+    if endpoint:
+        banner_parts.append(colored(f"Endpoint: {endpoint}", Colors.MAGENTA))
+
+    banner_parts.append(colored(f"Model: {model}", Colors.YELLOW))
+
+    print(" | ".join(banner_parts))
     print(colored("─" * 70, Colors.BLUE))

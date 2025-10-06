@@ -175,6 +175,90 @@ ollama:
   compatibility: generate
 ```
 
+#### `ollama.endpoint` (string)
+API endpoint path for Ollama requests. Supports automatic detection and manual override.
+
+**Default (Auto-detect):**
+```yaml
+ollama:
+  endpoint: null  # Auto-detect on first request
+```
+
+**Manual Override:**
+```yaml
+ollama:
+  endpoint: /api/chat           # Standard Ollama
+  endpoint: /api/generate        # Legacy Ollama
+  endpoint: /api/v1/generate     # Open-WebUI
+  endpoint: /v1/chat/completions # OpenAI-compatible proxy
+```
+
+**How Auto-Detection Works:**
+
+NORA automatically probes multiple endpoint paths on first connection:
+1. `/api/chat` - Native Ollama v0.3.9+
+2. `/api/generate` - Native Ollama < v0.3.9
+3. `/api/v1/generate` - Open-WebUI
+4. `/v1/chat/completions` - OpenAI-compatible proxies
+
+The first endpoint that responds (HTTP 200/400/405) is selected and cached in your config.
+
+**Connection Banner:**
+
+When endpoint is detected, you'll see:
+```
+──────────────────────────────────────────────────────────────────────
+NORA | Connected | http://localhost:11434 | Endpoint: /api/v1/generate | Model: qwen3-coder:480b
+──────────────────────────────────────────────────────────────────────
+```
+
+**Manual Configuration:**
+
+Override auto-detection for specific backends:
+
+```bash
+# For Open-WebUI
+nora config set ollama.endpoint /api/v1/generate
+
+# For standard Ollama
+nora config set ollama.endpoint /api/chat
+
+# Reset to auto-detect
+nora config set ollama.endpoint null
+```
+
+**Use Cases:**
+
+- **Standard Ollama**: No configuration needed, auto-detects `/api/chat`
+- **Older Ollama**: Auto-detects `/api/generate` or set manually
+- **Open-WebUI**: Auto-detects `/api/v1/generate`
+- **Proxied/Custom**: Manually set endpoint path
+
+**Example Configurations:**
+
+```yaml
+# Open-WebUI deployment
+model: qwen3-coder:480b
+ollama:
+  url: http://open-webui.local:11434
+  verify_ssl: false
+  endpoint: /api/v1/generate
+
+# OpenAI-compatible proxy
+model: gpt-4
+ollama:
+  url: https://api.proxy.com
+  verify_ssl: true
+  endpoint: /v1/chat/completions
+
+# Let NORA detect automatically (recommended)
+model: deepseek-coder:6.7b
+ollama:
+  url: http://localhost:11434
+  verify_ssl: false
+  # endpoint not set - will auto-detect
+```
+
 #### `profiles` (object)
 Named configuration presets for different environments.
 
