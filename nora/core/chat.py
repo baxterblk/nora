@@ -95,8 +95,9 @@ class OllamaChat:
                     }
 
                 # Send test request with timeout
-                # Increased to 15s to handle slow Ollama servers
-                r = requests.post(url, json=payload, timeout=15)
+                # Increased to 30s to handle slow Ollama servers
+                # Some servers take 20-25s for first request after idle
+                r = requests.post(url, json=payload, timeout=30)
 
                 # 404 means endpoint doesn't exist - try next candidate
                 # Any other status (even errors like 400/500) means endpoint exists
