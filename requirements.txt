@@ -1,2 +1,6 @@
-requests
-PyYAML
+# Note: This file is kept for backward compatibility.
+# The authoritative source for dependencies is pyproject.toml
+# Install using: pip install -e .
+
+requests>=2.25.0
+PyYAML>=5.4.0

@@ -15,7 +15,7 @@ import json
 import readline
 import pathlib
 import importlib.util
-from config_manager import ConfigManager
+from .config_manager import ConfigManager
 
 # -------------------------
 # Config & paths
