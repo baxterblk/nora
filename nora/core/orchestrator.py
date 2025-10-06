@@ -204,15 +204,20 @@ class Orchestrator:
                 task.completed = True
                 results[task.agent_name] = result
 
+                # Check if agent failed (for legacy agents that return error dict)
+                if result.get("success") is False and "error" in result:
+                    task.error = result["error"]
+                    logger.error(f"Agent {task.agent_name} failed: {result['error']}")
+                else:
+                    logger.info(f"Agent {task.agent_name} completed successfully")
+
                 # Update shared memory with context updates
                 if "context_updates" in result:
                     self.shared_memory.update(result["context_updates"])
 
-                logger.info(f"Agent {task.agent_name} completed successfully")
-
             except Exception as e:
                 logger.error(f"Agent {task.agent_name} failed: {e}", exc_info=True)
-                task.error = e
+                task.error = str(e)
                 task.completed = True
                 results[task.agent_name] = {"success": False, "error": str(e)}
 

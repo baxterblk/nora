@@ -198,27 +198,29 @@ class TestAgentsEndpoints:
         data = response.json()
         assert "not found" in data["detail"].lower()
 
-    def test_run_agent_failure(self, client):
+    def test_run_agent_failure(self, api_server, mock_plugins):
         """Test agent execution failure."""
-        with patch.object(client.app.state, 'plugin_loader', create=True) as mock_loader:
-            mock_loader.run_plugin.return_value = False
+        # Mock plugin_loader.run_plugin to return False (failure)
+        api_server.plugin_loader.run_plugin = Mock(return_value=False)
 
-            request_data = {
-                "agent_name": "test-agent",
-                "model": "test-model"
-            }
+        client = TestClient(api_server.app)
 
-            response = client.post("/agents/test-agent", json=request_data)
+        request_data = {
+            "agent_name": "test-agent",
+            "model": "test-model"
+        }
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is False
+        response = client.post("/agents/test-agent", json=request_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
 
 
 class TestProjectsEndpoints:
     """Tests for /projects endpoints."""
 
-    def test_index_project_success(self, client, tmp_path):
+    def test_index_project_success(self, api_server, tmp_path):
         """Test indexing a project."""
         project_dir = tmp_path / "test_project"
         project_dir.mkdir()
@@ -226,28 +228,30 @@ class TestProjectsEndpoints:
         # Create a dummy file
         (project_dir / "test.py").write_text("print('hello')")
 
+        # Mock the indexer instance
+        api_server.indexer.index_project = Mock(return_value={
+            "project_name": "test-project",
+            "total_files": 1,
+            "total_size": 100,
+            "files": []
+        })
+        api_server.indexer.save_index = Mock()
+
+        client = TestClient(api_server.app)
+
         request_data = {
             "project_path": str(project_dir),
             "project_name": "test-project"
         }
 
-        with patch('nora.api.server.ProjectIndexer') as MockIndexer:
-            mock_indexer = MockIndexer.return_value
-            mock_indexer.index_project.return_value = {
-                "project_name": "test-project",
-                "total_files": 1,
-                "total_size": 100,
-                "files": []
-            }
+        response = client.post("/projects/index", json=request_data)
 
-            response = client.post("/projects/index", json=request_data)
+        assert response.status_code == 200
+        data = response.json()
 
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["project_name"] == "test-project"
-            assert data["total_files"] == 1
-            assert data["total_size"] == 100
+        assert data["project_name"] == "test-project"
+        assert data["total_files"] == 1
+        assert data["total_size"] == 100
 
     def test_index_project_nonexistent_path(self, client):
         """Test indexing non-existent project."""
@@ -263,31 +267,32 @@ class TestProjectsEndpoints:
 
             assert response.status_code == 500
 
-    def test_search_index_success(self, client):
+    def test_search_index_success(self, api_server):
         """Test searching the index."""
+        # Mock the indexer instance
+        api_server.indexer.search = Mock(return_value=[
+            {
+                "relative_path": "test.py",
+                "relevance_score": 10,
+                "content_preview": "print('test')"
+            }
+        ])
+
+        client = TestClient(api_server.app)
+
         request_data = {
             "query": "test",
             "max_results": 10
         }
 
-        with patch('nora.api.server.ProjectIndexer') as MockIndexer:
-            mock_indexer = MockIndexer.return_value
-            mock_indexer.search.return_value = [
-                {
-                    "relative_path": "test.py",
-                    "relevance_score": 10,
-                    "content_preview": "print('test')"
-                }
-            ]
+        response = client.post("/projects/search", json=request_data)
 
-            response = client.post("/projects/search", json=request_data)
+        assert response.status_code == 200
+        data = response.json()
 
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["query"] == "test"
-            assert len(data["results"]) == 1
-            assert data["results"][0]["relative_path"] == "test.py"
+        assert data["query"] == "test"
+        assert len(data["results"]) == 1
+        assert data["results"][0]["relative_path"] == "test.py"
 
     def test_search_index_no_results(self, client):
         """Test search with no results."""
@@ -478,19 +483,20 @@ class TestAPIRequestValidation:
 class TestAPIErrorHandling:
     """Tests for error handling."""
 
-    def test_chat_internal_error(self, client):
+    def test_chat_internal_error(self, api_server, mock_config):
         """Test chat endpoint with internal error."""
+        # Mock the chat_client instance to raise exception
+        api_server.chat_client.chat = Mock(side_effect=Exception("Internal error"))
+
+        client = TestClient(api_server.app)
+
         request_data = {
             "messages": [{"role": "user", "content": "test"}]
         }
 
-        with patch('nora.api.server.OllamaChat') as MockChat:
-            mock_chat = MockChat.return_value
-            mock_chat.chat.side_effect = Exception("Internal error")
+        response = client.post("/chat", json=request_data)
 
-            response = client.post("/chat", json=request_data)
-
-            assert response.status_code == 500
+        assert response.status_code == 500
 
     def test_index_permission_error(self, client):
         """Test index endpoint with permission error."""

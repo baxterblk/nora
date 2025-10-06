@@ -238,14 +238,14 @@ class NoraAPIServer:
             Returns:
                 Agent execution result
             """
-            try:
-                plugin = self.plugins.get(agent_name)
-                if not plugin:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Agent not found: {agent_name}"
-                    )
+            plugin = self.plugins.get(agent_name)
+            if not plugin:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Agent not found: {agent_name}"
+                )
 
+            try:
                 model = request.model or self.config.get_model()
 
                 # Execute agent
