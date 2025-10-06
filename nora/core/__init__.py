@@ -7,7 +7,7 @@ Core functionality for NORA including configuration, chat, history, and plugin m
 from .config import ConfigManager
 from .history import HistoryManager
 from .chat import OllamaChat, load_file_context
-from .plugins import PluginLoader
+from .plugins import PluginLoader, Agent, Tool
 from . import utils
 
 __all__ = [
@@ -15,6 +15,8 @@ __all__ = [
     "HistoryManager",
     "OllamaChat",
     "PluginLoader",
+    "Agent",
+    "Tool",
     "load_file_context",
     "utils",
 ]
