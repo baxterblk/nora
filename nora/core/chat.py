@@ -61,6 +61,7 @@ class OllamaChat:
         Auto-detect the correct API endpoint by probing candidates.
 
         Tries multiple endpoint paths in order and returns the first one that responds.
+        Uses POST requests with minimal test payloads to accurately detect working endpoints.
         Caches the result to avoid repeated detection.
 
         Returns:
@@ -74,13 +75,38 @@ class OllamaChat:
         for candidate in self.ENDPOINT_CANDIDATES:
             url = f"{self.base_url}{candidate}"
             try:
-                # Use HEAD or GET with short timeout to check endpoint existence
-                # Status codes 200, 400, 405 indicate the endpoint exists
-                r = requests.get(url, timeout=2)
-                if r.status_code in (200, 400, 405):
+                # Determine if this is a chat-style or generate-style endpoint
+                is_chat_style = "chat" in candidate or "completions" in candidate
+
+                # Prepare minimal test payload
+                if is_chat_style:
+                    # Chat-style endpoints expect messages array
+                    payload = {
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": "test"}],
+                        "stream": False
+                    }
+                else:
+                    # Generate-style endpoints expect prompt string
+                    payload = {
+                        "model": self.model,
+                        "prompt": "test",
+                        "stream": False
+                    }
+
+                # Send test request with short timeout
+                # We accept any response that isn't connection failure or 404
+                r = requests.post(url, json=payload, timeout=3)
+
+                # 404 means endpoint doesn't exist - try next candidate
+                # Any other status (even errors like 400/500) means endpoint exists
+                if r.status_code != 404:
                     self._detected_endpoint = candidate
-                    logger.info(f"Detected endpoint: {candidate}")
+                    logger.info(f"Detected endpoint: {candidate} (status: {r.status_code})")
                     return candidate
+                else:
+                    logger.debug(f"Endpoint {candidate} returned 404, trying next candidate")
+
             except requests.RequestException as e:
                 logger.debug(f"Endpoint {candidate} failed: {e}")
                 continue

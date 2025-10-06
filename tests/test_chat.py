@@ -29,7 +29,8 @@ class TestOllamaChat:
     @patch('requests.post')
     def test_chat_endpoint_non_streaming(self, mock_post):
         """Test /api/chat endpoint without streaming"""
-        chat = OllamaChat("http://localhost:11434", "test-model", compatibility_mode="chat")
+        # Explicitly set endpoint to skip auto-detection
+        chat = OllamaChat("http://localhost:11434", "test-model", endpoint="/api/chat")
 
         # Mock successful response
         mock_response = Mock()
@@ -80,42 +81,43 @@ class TestOllamaChat:
         # Check that messages were converted to prompt
         assert "prompt" in call_args[1]["json"]
 
-    @patch('requests.get')
-    def test_endpoint_detection(self, mock_get):
+    @patch('requests.post')
+    def test_endpoint_detection(self, mock_post):
         """Test automatic endpoint detection"""
         chat = OllamaChat("http://localhost:11434", "test-model")
 
         # Mock /api/chat as available (returns 200)
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_get.return_value = mock_response
+        mock_post.return_value = mock_response
 
         # Detect endpoint
         detected = chat.detect_endpoint()
 
         assert detected == "/api/chat"
         assert chat._detected_endpoint == "/api/chat"
-        # Should have tried /api/chat first
-        assert mock_get.call_count >= 1
-        assert mock_get.call_args_list[0][0][0] == "http://localhost:11434/api/chat"
+        # Should have tried /api/chat first with POST
+        assert mock_post.call_count >= 1
+        assert mock_post.call_args_list[0][0][0] == "http://localhost:11434/api/chat"
 
-    @patch('requests.get')
-    def test_endpoint_detection_fallback(self, mock_get):
+    @patch('requests.post')
+    def test_endpoint_detection_fallback(self, mock_post):
         """Test endpoint detection with fallback to /api/generate"""
         chat = OllamaChat("http://localhost:11434", "test-model")
 
-        # Mock responses: /api/chat fails, /api/generate succeeds
+        # Mock responses: /api/chat returns 404, /api/generate succeeds
         def side_effect(*args, **kwargs):
             url = args[0]
+            mock_resp = Mock()
             if "/api/chat" in url:
-                raise requests.RequestException("404")
+                mock_resp.status_code = 404
+                return mock_resp
             elif "/api/generate" in url:
-                mock_resp = Mock()
                 mock_resp.status_code = 200
                 return mock_resp
             raise requests.RequestException("Not found")
 
-        mock_get.side_effect = side_effect
+        mock_post.side_effect = side_effect
 
         # Detect endpoint
         detected = chat.detect_endpoint()
@@ -123,21 +125,23 @@ class TestOllamaChat:
         assert detected == "/api/generate"
         assert chat._detected_endpoint == "/api/generate"
 
-    @patch('requests.get')
-    def test_endpoint_detection_open_webui(self, mock_get):
+    @patch('requests.post')
+    def test_endpoint_detection_open_webui(self, mock_post):
         """Test endpoint detection with Open-WebUI (/api/v1/generate)"""
         chat = OllamaChat("http://localhost:11434", "test-model")
 
-        # Mock responses: first two fail, /api/v1/generate succeeds
+        # Mock responses: first two return 404, /api/v1/generate succeeds
         def side_effect(*args, **kwargs):
             url = args[0]
+            mock_resp = Mock()
             if "/api/v1/generate" in url:
-                mock_resp = Mock()
                 mock_resp.status_code = 200
                 return mock_resp
-            raise requests.RequestException("Not found")
+            else:
+                mock_resp.status_code = 404
+                return mock_resp
 
-        mock_get.side_effect = side_effect
+        mock_post.side_effect = side_effect
 
         # Detect endpoint
         detected = chat.detect_endpoint()
