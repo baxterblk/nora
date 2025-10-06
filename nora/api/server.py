@@ -129,16 +129,18 @@ class NoraAPIServer:
         self.plugin_loader = PluginLoader()
         self.plugins = self.plugin_loader.load_plugins()
         self.indexer = ProjectIndexer()
+        compatibility_mode = config.get("ollama.compatibility", "chat")
         self.chat_client = OllamaChat(
             base_url=config.get_ollama_url(),
-            model=config.get_model()
+            model=config.get_model(),
+            compatibility_mode=compatibility_mode
         )
 
         # Create FastAPI app
         self.app = FastAPI(
             title="NORA API",
             description="REST API for NORA - No Rush on Anything",
-            version="0.4.1-beta",
+            version="0.4.1-beta1",
             lifespan=self.lifespan
         )
 
@@ -162,7 +164,7 @@ class NoraAPIServer:
             """API root endpoint."""
             return {
                 "name": "NORA API",
-                "version": "0.4.1-beta",
+                "version": "0.4.1-beta1",
                 "endpoints": [
                     "/chat",
                     "/agents",

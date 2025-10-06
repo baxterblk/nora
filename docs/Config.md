@@ -113,6 +113,68 @@ ollama:
   verify_ssl: true   # Enforce valid SSL
 ```
 
+#### `ollama.compatibility` (string)
+Ollama API endpoint compatibility mode for older server versions.
+
+**Default (Modern Ollama):**
+```yaml
+ollama:
+  compatibility: chat  # Use /api/chat (Ollama v0.3.9+)
+```
+
+**Legacy Mode (Older Ollama):**
+```yaml
+ollama:
+  compatibility: generate  # Use /api/generate (Ollama < v0.3.9)
+```
+
+**When to Use:**
+
+- **`chat` mode** (default): Use for Ollama v0.3.9 and newer
+  - Supports full conversation history with message roles
+  - Better context management
+  - Preferred for all modern installations
+
+- **`generate` mode**: Use for Ollama versions before v0.3.9
+  - Uses legacy `/api/generate` endpoint
+  - Converts messages to flat prompt format
+  - Required for older server versions
+
+**Check Your Ollama Version:**
+
+```bash
+curl http://localhost:11434/api/version
+```
+
+If the version is < 0.3.9, switch to generate mode:
+
+```bash
+nora config set ollama.compatibility generate
+nora config test
+```
+
+**Automatic Fallback:**
+
+NORA automatically detects when `/api/chat` is unavailable (404 error) and falls back to `/api/generate` with a warning:
+
+```
+⚠️ Ollama server missing /api/chat — falling back to /api/generate compatibility mode.
+⚠️ Consider upgrading Ollama or run: nora config set ollama.compatibility generate
+```
+
+This fallback happens once per session. To avoid the warning, explicitly set the compatibility mode.
+
+**Example Configuration:**
+
+```yaml
+# For older Ollama servers
+model: deepseek-coder:6.7b
+ollama:
+  url: http://localhost:11434
+  verify_ssl: false
+  compatibility: generate
+```
+
 #### `profiles` (object)
 Named configuration presets for different environments.
 

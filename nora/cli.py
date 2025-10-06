@@ -46,8 +46,11 @@ def chat_loop(
     # Show connection banner
     utils.connection_banner(ollama_url, model)
 
+    # Get compatibility mode (default to "chat")
+    compatibility_mode = config.get("ollama.compatibility", "chat")
+
     # Initialize chat client
-    chat_client = OllamaChat(ollama_url, model)
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
 
     # Load history
     history = history_manager.load()
@@ -121,8 +124,9 @@ def run_one_shot(
     """
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
+    compatibility_mode = config.get("ollama.compatibility", "chat")
 
-    chat_client = OllamaChat(ollama_url, model)
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
 
     messages = []
 
@@ -190,7 +194,8 @@ def run_agent(
     utils.info(f"Running agent '{name}' — {plugin.get('description', '')}")
 
     # Create chat function for the agent
-    chat_client = OllamaChat(ollama_url, model)
+    compatibility_mode = config.get("ollama.compatibility", "chat")
+    chat_client = OllamaChat(ollama_url, model, compatibility_mode=compatibility_mode)
 
     def agent_chat(messages, model=model, stream=False):
         chat_client.chat(messages, model=model, stream=stream)
@@ -322,7 +327,8 @@ def run_team(config: ConfigManager, team_config_path: str, plugin_loader: Plugin
 
         # Create orchestrator
         model = team_config.get("model", config.get_model())
-        chat_client = OllamaChat(config.get_ollama_url(), model)
+        compatibility_mode = config.get("ollama.compatibility", "chat")
+        chat_client = OllamaChat(config.get_ollama_url(), model, compatibility_mode=compatibility_mode)
 
         orchestrator = Orchestrator(
             model=model,
