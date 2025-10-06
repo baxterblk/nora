@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nora-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "NORA - No Rush (on) Anything: A private, local AI agent CLI for Ollama"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -31,8 +31,16 @@ dependencies = [
     "PyYAML>=5.4.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+
 [project.urls]
-Repository = "https://github.com/yourusername/nora"
+Repository = "https://git.blakbox.vip/AI-Labs/nora"
+Issues = "https://git.blakbox.vip/AI-Labs/nora/issues"
 
 [project.scripts]
 nora = "nora.cli:main"
