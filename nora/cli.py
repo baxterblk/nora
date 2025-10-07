@@ -18,6 +18,7 @@ import sys
 from typing import List, Optional
 
 from .core import ConfigManager, HistoryManager, OllamaChat, PluginLoader, load_file_context
+from .core import ActionsManager, ActionInterpreter
 from .core import utils
 
 logger = logging.getLogger(__name__)
@@ -43,10 +44,12 @@ def chat_loop(
     history_manager: HistoryManager,
     model: Optional[str] = None,
     context_files: Optional[List[str]] = None,
-    system: Optional[str] = None
+    system: Optional[str] = None,
+    enable_actions: bool = False,
+    safe_mode: bool = True
 ) -> None:
     """
-    Run an interactive chat REPL.
+    Run an interactive chat REPL with optional file actions support.
 
     Args:
         config: Configuration manager instance
@@ -54,6 +57,8 @@ def chat_loop(
         model: Model name (defaults to config)
         context_files: List of file paths for context injection
         system: System prompt
+        enable_actions: If True, execute file operations from model output
+        safe_mode: If True, prompt before overwriting files (ignored if enable_actions=False)
     """
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
@@ -78,6 +83,17 @@ def chat_loop(
     # Load history
     history = history_manager.load()
 
+    # Initialize actions system if enabled
+    actions_manager: Optional[ActionsManager] = None
+    interpreter: Optional[ActionInterpreter] = None
+
+    if enable_actions:
+        import os
+        actions_manager = ActionsManager(project_root=os.getcwd(), safe_mode=safe_mode)
+        interpreter = ActionInterpreter()
+        utils.info(f"Actions enabled (safe_mode={'on' if safe_mode else 'off'})")
+        logger.info(f"ActionsManager initialized at {os.getcwd()}")
+
     # Load file context if provided
     file_context = ""
     if context_files:
@@ -85,6 +101,11 @@ def chat_loop(
         if file_context:
             system = (system or "") + "\n\nYou have access to the following files:\n" + file_context
             utils.info(f"Loaded context from {len(context_files)} file(s)")
+
+    # Add actions system prompt if actions are enabled
+    if enable_actions and interpreter:
+        actions_prompt = interpreter.format_system_prompt()
+        system = (system or "") + "\n\n" + actions_prompt
 
     print(f"\nType {utils.colored('/exit', utils.Colors.CYAN)} to quit, {utils.colored('/clear', utils.Colors.CYAN)} to reset history.\n")
 
@@ -118,12 +139,66 @@ def chat_loop(
 
         # Send chat request
         try:
-            chat_client.chat(messages, model=model, stream=True)
+            response = chat_client.chat(messages, model=model, stream=True)
+
+            # Extract response content
+            response_text = ""
+            if response:
+                if "message" in response:
+                    response_text = response["message"]["content"]
+                elif "response" in response:
+                    response_text = response["response"]
 
             # Update history
             history = history_manager.add_message(history, "user", prompt)
-            history = history_manager.add_message(history, "assistant", "[streamed above]")
+            history = history_manager.add_message(history, "assistant", response_text or "[streamed above]")
             print()
+
+            # Process actions if enabled
+            if enable_actions and interpreter and actions_manager and response_text:
+                file_actions = interpreter.extract_actions(response_text)
+                command_actions = interpreter.extract_commands(response_text)
+
+                # Execute file actions
+                for action in file_actions:
+                    if action.action_type == "create" and action.content:
+                        success, msg = actions_manager.create_file(action.path, action.content)
+                        if success:
+                            utils.success(msg)
+                        else:
+                            utils.error(msg)
+
+                    elif action.action_type == "append" and action.content:
+                        success, msg = actions_manager.append_file(action.path, action.content)
+                        if success:
+                            utils.info(f"✏️  {msg}")
+                        else:
+                            utils.error(msg)
+
+                    elif action.action_type == "read":
+                        success, content = actions_manager.read_file(action.path)
+                        if success:
+                            utils.info(f"📖 Read: {action.path} ({len(content)} chars)")
+                        else:
+                            utils.error(content)
+
+                    elif action.action_type == "delete":
+                        success, msg = actions_manager.delete_file(action.path)
+                        if success:
+                            utils.info(f"🗑️  {msg}")
+                        else:
+                            utils.error(msg)
+
+                # Execute command actions
+                for cmd_action in command_actions:
+                    utils.info(f"⚙️  Running: {cmd_action.command}")
+                    success, output = actions_manager.run_command(cmd_action.command, cwd=cmd_action.cwd)
+                    if success:
+                        utils.success(f"Command succeeded: {cmd_action.command}")
+                        if output.strip():
+                            print(output)
+                    else:
+                        utils.error(f"Command failed: {output}")
 
         except Exception as e:
             utils.error(f"Chat request failed: {e}")
@@ -532,6 +607,16 @@ def main() -> None:
     p_chat.add_argument("-m", "--model", help="Model name")
     p_chat.add_argument("--system", help="System prompt")
     p_chat.add_argument("--context", nargs="*", help="File(s) to include as context")
+    p_chat.add_argument(
+        "--enable-actions",
+        action="store_true",
+        help="Enable file operations and command execution from model output"
+    )
+    p_chat.add_argument(
+        "--no-confirm",
+        action="store_true",
+        help="Skip confirmation prompts for file overwrites (use with --enable-actions)"
+    )
 
     # run
     p_run = sub.add_parser("run", help="One-shot prompt")
@@ -594,7 +679,9 @@ def main() -> None:
             history_manager,
             model=args.model,
             context_files=args.context,
-            system=args.system
+            system=args.system,
+            enable_actions=args.enable_actions,
+            safe_mode=not args.no_confirm
         )
 
     elif args.cmd == "run":

@@ -194,8 +194,8 @@ class OllamaChat:
             resp.raise_for_status()
 
             if stream:
-                self._handle_stream_chat(resp)
-                return None
+                accumulated = self._handle_stream_chat(resp)
+                return {"message": {"content": accumulated}}
             else:
                 data = resp.json()
                 # Handle both Ollama and OpenAI-style responses
@@ -248,20 +248,24 @@ class OllamaChat:
             resp.raise_for_status()
 
             if stream:
-                self._handle_stream_generate(resp)
-                return None
+                accumulated = self._handle_stream_generate(resp)
+                return {"response": accumulated}
             else:
                 data = resp.json()
                 print(data["response"])
                 return data
 
-    def _handle_stream_chat(self, response: requests.Response) -> None:
+    def _handle_stream_chat(self, response: requests.Response) -> str:
         """
         Handle streaming response from /api/chat endpoint.
 
         Args:
             response: Streaming HTTP response
+
+        Returns:
+            Accumulated response text
         """
+        accumulated = []
         for line in response.iter_lines():
             if not line:
                 continue
@@ -271,6 +275,7 @@ class OllamaChat:
                 delta = data.get("message", {}).get("content", "")
                 if delta:
                     print(delta, end="", flush=True)
+                    accumulated.append(delta)
                 if data.get("done"):
                     print()
                     break
@@ -278,13 +283,19 @@ class OllamaChat:
                 logger.warning(f"Failed to decode streaming response: {e}")
                 continue
 
-    def _handle_stream_generate(self, response: requests.Response) -> None:
+        return "".join(accumulated)
+
+    def _handle_stream_generate(self, response: requests.Response) -> str:
         """
         Handle streaming response from /api/generate endpoint.
 
         Args:
             response: Streaming HTTP response
+
+        Returns:
+            Accumulated response text
         """
+        accumulated = []
         for line in response.iter_lines():
             if not line:
                 continue
@@ -294,12 +305,15 @@ class OllamaChat:
                 delta = data.get("response", "")
                 if delta:
                     print(delta, end="", flush=True)
+                    accumulated.append(delta)
                 if data.get("done"):
                     print()
                     break
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to decode streaming response: {e}")
                 continue
+
+        return "".join(accumulated)
 
 
 def load_file_context(paths: Optional[List[str]]) -> str:

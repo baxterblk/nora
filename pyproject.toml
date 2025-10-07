@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nora-cli"
-version = "0.4.1-beta2"
+version = "0.4.2"
 description = "NORA - No Rush (on) Anything: A private, local AI agent CLI for Ollama"
 readme = "README.md"
 requires-python = ">=3.8"
