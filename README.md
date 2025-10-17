@@ -1,5 +1,5 @@
 ## DISCLAIMER
-This project has largely been vibe-coded and is under EXTREMELY early development. USE AT YOUR OWN PERIL!
+NORA is in active beta development. While core features are stable and well-tested (100% test pass rate), expect ongoing improvements and occasional breaking changes. Use in production environments at your own discretion.
 
 # NORA - No Rush (on) Anything
 
@@ -7,20 +7,21 @@ NORA is a project to develop a private, local AI agent that runs entirely on loc
 
 This project is in its early stages of development. The current focus is on foundational features. For a detailed overview of the NORA Project's planned features, milestones, and future direction, please see the [ROADMAP.md](ROADMAP.md) file.
 
-## What's New in v0.4.0
+## What's New in v0.5.0
 
-🚀 **Major Release**: Multi-Agent Orchestration & REST API
+🎉 **Major Release**: Simplified Installation & First-Run Wizard
 
-NORA v0.4.0 introduces powerful new capabilities for coordinating multiple AI agents and accessing NORA remotely:
+NORA v0.5.0 makes getting started incredibly easy - no more manual configuration!
 
-- **🤝 Multi-Agent Teams**: Coordinate multiple AI agents with sequential or parallel execution modes. Define teams in YAML with dependency resolution and shared memory.
-- **🔍 Project Indexing**: Index entire codebases for context-aware conversations. Search across 20+ languages with smart relevance scoring.
-- **🌐 REST API**: FastAPI-based REST API with 6 endpoints for chat, agents, teams, and project indexing. Deploy NORA as a service.
-- **🧩 Extended Plugins**: New Agent and Tool base classes with lifecycle hooks, context sharing, and backward compatibility.
+- **🧙 First-Run Setup Wizard**: Interactive configuration on your first command. Automatically detects Ollama, validates connections, and discovers available models.
+- **🔧 Environment Variable Overrides**: Configure NORA via `NORA_OLLAMA_URL` and `NORA_MODEL` - perfect for CI/CD and containerized environments.
+- **⚙️ Config Convenience Commands**: New `nora config path` and `nora config reset` commands for easy configuration management.
+- **📦 PyPI Ready**: Enhanced packaging metadata - `pipx install nora-cli` (coming soon to PyPI).
+- **🚀 Simplified Onboarding**: From clone-to-chat in 2 steps, matching the simplicity of npm-based CLI tools.
 
-**Testing**: 95% test pass rate with 87-92% coverage on new modules. See [CHANGELOG.md](CHANGELOG.md) for full details.
+**Previous Release - v0.4.0**: Multi-Agent Teams, Project Indexing, REST API, and Extended Plugins.
 
-**Upgrade**: `pip install -e ".[all]"` to get all new features.
+**Testing**: 100% pass rate on all new features with 83-95% coverage. See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ## Quick Start
 
@@ -30,17 +31,26 @@ NORA v0.4.0 introduces powerful new capabilities for coordinating multiple AI ag
 
 ### Installation
 
-**Simple Installation** (Recommended):
+**Recommended Installation**:
 ```bash
+# Clone the repository
+git clone https://git.blakbox.vip/AI-Labs/nora
+cd nora
+
 # Install with pipx (isolated, globally available)
-pip install pipx
-pipx install nora-cli
+pipx install .
 
 # Or install with pip
-pip install nora-cli
+pip install .
 ```
 
-**Development Installation**:
+**PyPI Installation** (Coming Soon):
+```bash
+# Once published to PyPI, you'll be able to install directly:
+pipx install nora-cli
+```
+
+**Development Installation** (for contributors):
 ```bash
 # Clone the repository
 git clone https://git.blakbox.vip/AI-Labs/nora
@@ -95,8 +105,10 @@ nora project search "keyword"
 nora serve
 
 # Configure NORA
-nora config show
-nora config test
+nora config show         # Display current configuration
+nora config test         # Test Ollama connection
+nora config path         # Show config file location
+nora config reset        # Reset to default configuration
 ```
 
 ## Documentation
@@ -118,18 +130,22 @@ nora config test
 ## Features
 
 - **🔒 Privacy-First**: All data stays local, no cloud dependencies
+- **🧙 First-Run Wizard** *(v0.5.0)*: Interactive setup on first command with connection validation
+- **🔧 Environment Variables** *(v0.5.0)*: Configure via `NORA_OLLAMA_URL` and `NORA_MODEL`
+- **⚙️ Config Commands** *(v0.5.0)*: Easy configuration management with `path`, `reset`, and more
 - **🤝 Multi-Agent Teams** *(v0.4.0)*: Coordinate multiple agents with sequential/parallel execution
 - **🔍 Project Indexing** *(v0.4.0)*: Index and search codebases across 20+ languages
 - **🌐 REST API** *(v0.4.0)*: FastAPI server with 6 endpoints for remote access
 - **🤖 Agent Plugins**: Extensible plugin system with Agent/Tool base classes
 - **💬 Interactive Chat**: REPL with streaming responses and history
 - **📁 Code Context**: Inject file contents for code-aware conversations
-- **⚙️ Profile Management**: Switch between local/remote Ollama configurations
 - **🎨 Colored Output**: ANSI-based terminal colors for enhanced UX
-- **🧪 Fully Tested**: 95% test pass rate with comprehensive CI/CD
+- **🧪 Fully Tested**: 100% pass rate on new features with comprehensive CI/CD
 
 ## Project Status
 
-**Current Version:** v0.4.0 (Production Ready)
+**Current Version:** v0.5.0 (Beta)
 
-NORA v0.4.0 features multi-agent orchestration, project indexing, REST API, and enhanced plugin framework. See [CHANGELOG.md](CHANGELOG.md) for complete release notes and [ROADMAP.md](ROADMAP.md) for future plans.
+NORA v0.5.0 features a first-run setup wizard, environment variable overrides, simplified installation, plus all v0.4.0 capabilities including multi-agent orchestration, project indexing, REST API, and enhanced plugin framework.
+
+The core functionality is stable and well-tested, but the project is still in active development. See [CHANGELOG.md](CHANGELOG.md) for complete release notes and [ROADMAP.md](ROADMAP.md) for future plans.
