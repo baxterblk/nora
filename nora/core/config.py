@@ -5,6 +5,7 @@ Handles user configuration for Ollama connections and profiles with structured l
 """
 
 import logging
+import os
 import pathlib
 from typing import Any, Dict, Optional, Tuple
 import yaml
@@ -123,18 +124,30 @@ class ConfigManager:
         """
         Get the Ollama API URL from configuration.
 
+        Environment variable NORA_OLLAMA_URL takes precedence over config file.
+
         Returns:
             Ollama URL string
         """
+        # Check environment variable first
+        if url := os.environ.get("NORA_OLLAMA_URL"):
+            return url
+        # Fall back to config file
         return self.config.get("ollama", {}).get("url", "http://localhost:11434")
 
     def get_model(self) -> str:
         """
         Get the default model name from configuration.
 
+        Environment variable NORA_MODEL takes precedence over config file.
+
         Returns:
             Model name string
         """
+        # Check environment variable first
+        if model := os.environ.get("NORA_MODEL"):
+            return model
+        # Fall back to config file
         return self.config.get("model", "deepseek-coder:6.7b")
 
     def list_profiles(self) -> list:
