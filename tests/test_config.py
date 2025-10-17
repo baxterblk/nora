@@ -86,6 +86,34 @@ class TestConfigManager:
         model = manager.get_model()
         assert model == DEFAULT_CONFIG["model"]
 
+    def test_environment_variable_overrides(self, tmp_path):
+        """Test that environment variables override config file values"""
+        config_path = tmp_path / "test_config.yaml"
+
+        # Create a config with specific values
+        import yaml
+        test_config = {
+            "model": "config-model",
+            "ollama": {"url": "http://config:11434", "verify_ssl": False},
+        }
+        with open(config_path, "w") as f:
+            yaml.safe_dump(test_config, f)
+
+        manager = ConfigManager(str(config_path))
+
+        # Test without env vars - should use config values
+        assert manager.get_model() == "config-model"
+        assert manager.get_ollama_url() == "http://config:11434"
+
+        # Test with env vars - should override config
+        with patch.dict('os.environ', {'NORA_MODEL': 'env-model', 'NORA_OLLAMA_URL': 'http://env:11434'}):
+            assert manager.get_model() == "env-model"
+            assert manager.get_ollama_url() == "http://env:11434"
+
+        # After patch, should revert to config values
+        assert manager.get_model() == "config-model"
+        assert manager.get_ollama_url() == "http://config:11434"
+
     def test_list_profiles(self, tmp_path):
         """Test listing available profiles"""
         config_path = tmp_path / "test_config.yaml"

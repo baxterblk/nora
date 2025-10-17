@@ -10,6 +10,7 @@ from .chat import OllamaChat, load_file_context
 from .plugins import PluginLoader
 from .actions import ActionsManager
 from .interpreter import ActionInterpreter, FileAction, CommandAction
+from .setup import first_run_wizard, should_run_wizard
 from . import utils
 
 __all__ = [
@@ -22,5 +23,7 @@ __all__ = [
     "FileAction",
     "CommandAction",
     "load_file_context",
+    "first_run_wizard",
+    "should_run_wizard",
     "utils",
 ]

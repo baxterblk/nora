@@ -25,22 +25,45 @@ NORA v0.4.0 introduces powerful new capabilities for coordinating multiple AI ag
 ## Quick Start
 
 ### Prerequisites
-- Python 3.7+
+- Python 3.8+
 - [Ollama](https://ollama.ai) installed and running locally
 
 ### Installation
 
+**Simple Installation** (Recommended):
+```bash
+# Install with pipx (isolated, globally available)
+pip install pipx
+pipx install nora-cli
+
+# Or install with pip
+pip install nora-cli
+```
+
+**Development Installation**:
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://git.blakbox.vip/AI-Labs/nora
 cd nora
 
 # Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install NORA in editable mode
-pip install -e .
+# Install in editable mode with dev dependencies
+pip install -e ".[dev]"
+```
+
+### First Run
+
+NORA will automatically run an interactive setup wizard on your first command:
+
+```bash
+# Run any command to trigger the wizard
+nora chat
+
+# Or skip the wizard and use environment variables
+NORA_OLLAMA_URL=http://localhost:11434 NORA_MODEL=llama3:8b nora chat
 ```
 
 ### Usage

@@ -18,8 +18,10 @@ import sys
 from typing import List, Optional
 
 from .core import ConfigManager, HistoryManager, OllamaChat, PluginLoader, load_file_context
+from .core.config import DEFAULT_CONFIG
 from .core import ActionsManager, ActionInterpreter
 from .core import utils
+from .core.setup import first_run_wizard, should_run_wizard
 
 logger = logging.getLogger(__name__)
 
@@ -385,7 +387,7 @@ def config_command(config: ConfigManager, action: str, args: List[str]) -> None:
 
     Args:
         config: Configuration manager instance
-        action: Action to perform (show, set, use, test)
+        action: Action to perform (show, set, use, test, path, reset)
         args: Additional arguments
     """
     if action == "show":
@@ -417,6 +419,14 @@ def config_command(config: ConfigManager, action: str, args: List[str]) -> None:
         else:
             utils.error(f"Connection failed: {resp}")
             sys.exit(1)
+
+    elif action == "path":
+        print(config.path)
+
+    elif action == "reset":
+        config.config = DEFAULT_CONFIG.copy()
+        config.save()
+        utils.success(f"Configuration reset to defaults at {config.path}")
 
 
 def run_team(config: ConfigManager, team_config_path: str, plugin_loader: PluginLoader) -> None:
@@ -600,6 +610,12 @@ def main() -> None:
         help="Log to file"
     )
 
+    parser.add_argument(
+        "--no-wizard",
+        action="store_true",
+        help="Skip first-run setup wizard"
+    )
+
     sub = parser.add_subparsers(dest="cmd", help="Commands")
 
     # chat
@@ -651,7 +667,7 @@ def main() -> None:
     p_conf = sub.add_parser("config", help="Manage configuration")
     p_conf.add_argument(
         "action",
-        choices=["show", "set", "use", "test"],
+        choices=["show", "set", "use", "test", "path", "reset"],
         help="Action to perform"
     )
     p_conf.add_argument("args", nargs="*", help="Action arguments")
@@ -666,6 +682,14 @@ def main() -> None:
     # Setup logging
     log_level = "DEBUG" if args.verbose else "INFO"
     utils.setup_logging(log_level, args.log_file)
+
+    # Run first-run wizard if needed
+    # Only run for commands that need configuration (not config, serve, or help)
+    if (not args.no_wizard and
+        args.cmd and
+        args.cmd not in ["config"] and
+        should_run_wizard()):
+        first_run_wizard()
 
     # Initialize core components
     config = ConfigManager()
