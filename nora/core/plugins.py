@@ -9,12 +9,13 @@ import importlib.util
 import logging
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Callable, List
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Abstract Base Classes for v0.4.0+
+
 
 class Agent(ABC):
     """
@@ -51,7 +52,7 @@ class Agent(ABC):
         context: Dict[str, Any],
         model: str,
         call_fn: Callable,
-        tools: Optional[Dict[str, "Tool"]] = None
+        tools: Optional[Dict[str, "Tool"]] = None,
     ) -> Dict[str, Any]:
         """
         Execute the agent's main logic.
@@ -211,7 +212,11 @@ class PluginLoader:
             # Check for class-based agent (v0.4.0+)
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
-                if isinstance(attr, type) and issubclass(attr, Agent) and attr is not Agent:
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, Agent)
+                    and attr is not Agent
+                ):
                     try:
                         agent_instance = attr()
                         metadata = agent_instance.metadata()
@@ -228,18 +233,20 @@ class PluginLoader:
                             "type": "class-based-agent",
                             "instance": agent_instance,
                             "run": lambda model, call_fn, ctx=None: agent_instance.run(
-                                context=ctx or {},
-                                model=model,
-                                call_fn=call_fn
-                            )
+                                context=ctx or {}, model=model, call_fn=call_fn
+                            ),
                         }
                     except Exception as e:
-                        logger.error(f"Failed to instantiate agent from {file_path}: {e}")
+                        logger.error(
+                            f"Failed to instantiate agent from {file_path}: {e}"
+                        )
                         return None
 
             # Fall back to legacy function-based plugin
             if not hasattr(module, "register"):
-                logger.warning(f"Plugin {file_path.name} missing 'register' function or Agent class")
+                logger.warning(
+                    f"Plugin {file_path.name} missing 'register' function or Agent class"
+                )
                 return None
 
             entry = module.register()
@@ -257,7 +264,9 @@ class PluginLoader:
             logger.error(f"Failed to load plugin from {file_path}: {e}", exc_info=True)
             return None
 
-    def _validate_agent_metadata(self, metadata: Dict[str, Any], file_path: pathlib.Path) -> bool:
+    def _validate_agent_metadata(
+        self, metadata: Dict[str, Any], file_path: pathlib.Path
+    ) -> bool:
         """
         Validate agent metadata against schema.
 
@@ -272,7 +281,9 @@ class PluginLoader:
 
         for key in required_keys:
             if key not in metadata:
-                logger.error(f"Agent {file_path.name} missing required metadata key: {key}")
+                logger.error(
+                    f"Agent {file_path.name} missing required metadata key: {key}"
+                )
                 return False
 
         # Validate types
@@ -281,7 +292,9 @@ class PluginLoader:
             return False
 
         if not isinstance(metadata["description"], str):
-            logger.error(f"Agent {file_path.name} metadata 'description' must be string")
+            logger.error(
+                f"Agent {file_path.name} metadata 'description' must be string"
+            )
             return False
 
         if not isinstance(metadata["version"], str):
@@ -289,18 +302,26 @@ class PluginLoader:
             return False
 
         # Validate optional fields
-        if "capabilities" in metadata and not isinstance(metadata["capabilities"], list):
+        if "capabilities" in metadata and not isinstance(
+            metadata["capabilities"], list
+        ):
             logger.error(f"Agent {file_path.name} metadata 'capabilities' must be list")
             return False
 
-        if "requires_tools" in metadata and not isinstance(metadata["requires_tools"], list):
-            logger.error(f"Agent {file_path.name} metadata 'requires_tools' must be list")
+        if "requires_tools" in metadata and not isinstance(
+            metadata["requires_tools"], list
+        ):
+            logger.error(
+                f"Agent {file_path.name} metadata 'requires_tools' must be list"
+            )
             return False
 
         logger.debug(f"Validated metadata for agent: {metadata['name']}")
         return True
 
-    def get_plugin(self, name: str, plugins: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def get_plugin(
+        self, name: str, plugins: Dict[str, Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """
         Get a plugin by name.
 
@@ -318,7 +339,7 @@ class PluginLoader:
         name: str,
         plugins: Dict[str, Dict[str, Any]],
         model: str,
-        chat_fn: Callable
+        chat_fn: Callable,
     ) -> bool:
         """
         Run a plugin by name.

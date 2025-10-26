@@ -8,15 +8,17 @@ import logging
 import os
 import pathlib
 from typing import Any, Dict, Optional, Tuple
-import yaml
-import requests
+
+import requests  # type: ignore
+import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "model": "deepseek-coder:6.7b",
-    "ollama": {"url": "http://localhost:11434", "verify_ssl": False},
+    "ollama": {"url": "http://192.168.50.5:11434", "verify_ssl": False},
     "profiles": {},
+    "history_summary_threshold": 20,
 }
 
 

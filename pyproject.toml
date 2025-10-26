@@ -33,6 +33,9 @@ classifiers = [
 dependencies = [
     "requests>=2.25.0",
     "PyYAML>=5.4.0",
+    "faiss-cpu>=1.7.4",
+    "sentence-transformers>=2.2.2",
+    "argcomplete>=3.1.1",
 ]
 
 [project.optional-dependencies]
@@ -61,12 +64,10 @@ all = [
     "pydantic>=2.0.0",
 ]
 
-[project.urls]
-Repository = "https://git.blakbox.vip/AI-Labs/nora"
-Issues = "https://git.blakbox.vip/AI-Labs/nora/issues"
-
 [project.scripts]
 nora = "nora.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["nora"]
+
+[project.urls]

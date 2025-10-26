@@ -5,14 +5,17 @@ Tests FastAPI endpoints with mocked dependencies.
 Requires: pytest-asyncio, httpx
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 import sys
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Check if FastAPI is available
 try:
     from fastapi.testclient import TestClient
+
     from nora.api.server import NoraAPIServer
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -27,7 +30,7 @@ def mock_config():
     config.get_ollama_url.return_value = "http://localhost:11434"
     config.config = {
         "model": "test-model",
-        "ollama": {"url": "http://localhost:11434", "verify_ssl": False}
+        "ollama": {"url": "http://localhost:11434", "verify_ssl": False},
     }
     return config
 
@@ -41,24 +44,24 @@ def mock_plugins():
             "description": "Test agent",
             "version": "1.0.0",
             "type": "legacy-function",
-            "run": Mock()
+            "run": Mock(),
         },
         "class-agent": {
             "name": "class-agent",
             "description": "Class-based agent",
             "version": "1.0.0",
             "type": "class-based-agent",
-            "instance": Mock()
-        }
+            "instance": Mock(),
+        },
     }
 
 
 @pytest.fixture
 def api_server(mock_config, mock_plugins):
     """Create API server with mocked dependencies."""
-    with patch('nora.api.server.PluginLoader') as MockPluginLoader, \
-         patch('nora.api.server.ProjectIndexer') as MockIndexer, \
-         patch('nora.api.server.OllamaChat') as MockChat:
+    with patch("nora.api.server.PluginLoader") as MockPluginLoader, patch(
+        "nora.api.server.ProjectIndexer"
+    ) as MockIndexer, patch("nora.api.server.OllamaChat") as MockChat:
 
         # Setup mock plugin loader
         mock_loader = MockPluginLoader.return_value
@@ -104,11 +107,9 @@ class TestChatEndpoint:
     def test_chat_endpoint_success(self, client):
         """Test successful chat request."""
         request_data = {
-            "messages": [
-                {"role": "user", "content": "Hello"}
-            ],
+            "messages": [{"role": "user", "content": "Hello"}],
             "model": "test-model",
-            "stream": False
+            "stream": False,
         }
 
         response = client.post("/chat", json=request_data)
@@ -122,10 +123,8 @@ class TestChatEndpoint:
     def test_chat_endpoint_default_model(self, client):
         """Test chat with default model."""
         request_data = {
-            "messages": [
-                {"role": "user", "content": "Hello"}
-            ],
-            "stream": False
+            "messages": [{"role": "user", "content": "Hello"}],
+            "stream": False,
         }
 
         response = client.post("/chat", json=request_data)
@@ -168,14 +167,13 @@ class TestAgentsEndpoints:
     def test_run_agent_success(self, client, mock_plugins):
         """Test running an agent successfully."""
         # Mock the plugin loader's run_plugin method
-        with patch.object(client.app.state, 'plugin_loader', create=True) as mock_loader:
+        with patch.object(
+            client.app.state, "plugin_loader", create=True
+        ) as mock_loader:
             mock_loader.run_plugin.return_value = True
 
             # Make API request - note the corrected endpoint format
-            request_data = {
-                "agent_name": "test-agent",
-                "model": "test-model"
-            }
+            request_data = {"agent_name": "test-agent", "model": "test-model"}
 
             response = client.post("/agents/test-agent", json=request_data)
 
@@ -187,10 +185,7 @@ class TestAgentsEndpoints:
 
     def test_run_agent_not_found(self, client):
         """Test running non-existent agent."""
-        request_data = {
-            "agent_name": "nonexistent",
-            "model": "test-model"
-        }
+        request_data = {"agent_name": "nonexistent", "model": "test-model"}
 
         response = client.post("/agents/nonexistent", json=request_data)
 
@@ -205,10 +200,7 @@ class TestAgentsEndpoints:
 
         client = TestClient(api_server.app)
 
-        request_data = {
-            "agent_name": "test-agent",
-            "model": "test-model"
-        }
+        request_data = {"agent_name": "test-agent", "model": "test-model"}
 
         response = client.post("/agents/test-agent", json=request_data)
 
@@ -229,19 +221,21 @@ class TestProjectsEndpoints:
         (project_dir / "test.py").write_text("print('hello')")
 
         # Mock the indexer instance
-        api_server.indexer.index_project = Mock(return_value={
-            "project_name": "test-project",
-            "total_files": 1,
-            "total_size": 100,
-            "files": []
-        })
+        api_server.indexer.index_project = Mock(
+            return_value={
+                "project_name": "test-project",
+                "total_files": 1,
+                "total_size": 100,
+                "files": [],
+            }
+        )
         api_server.indexer.save_index = Mock()
 
         client = TestClient(api_server.app)
 
         request_data = {
             "project_path": str(project_dir),
-            "project_name": "test-project"
+            "project_name": "test-project",
         }
 
         response = client.post("/projects/index", json=request_data)
@@ -255,11 +249,9 @@ class TestProjectsEndpoints:
 
     def test_index_project_nonexistent_path(self, client):
         """Test indexing non-existent project."""
-        request_data = {
-            "project_path": "/nonexistent/path"
-        }
+        request_data = {"project_path": "/nonexistent/path"}
 
-        with patch('nora.api.server.ProjectIndexer') as MockIndexer:
+        with patch("nora.api.server.ProjectIndexer") as MockIndexer:
             mock_indexer = MockIndexer.return_value
             mock_indexer.index_project.side_effect = FileNotFoundError("Path not found")
 
@@ -270,20 +262,19 @@ class TestProjectsEndpoints:
     def test_search_index_success(self, api_server):
         """Test searching the index."""
         # Mock the indexer instance
-        api_server.indexer.search = Mock(return_value=[
-            {
-                "relative_path": "test.py",
-                "relevance_score": 10,
-                "content_preview": "print('test')"
-            }
-        ])
+        api_server.indexer.search = Mock(
+            return_value=[
+                {
+                    "relative_path": "test.py",
+                    "relevance_score": 10,
+                    "content_preview": "print('test')",
+                }
+            ]
+        )
 
         client = TestClient(api_server.app)
 
-        request_data = {
-            "query": "test",
-            "max_results": 10
-        }
+        request_data = {"query": "test", "max_results": 10}
 
         response = client.post("/projects/search", json=request_data)
 
@@ -296,11 +287,9 @@ class TestProjectsEndpoints:
 
     def test_search_index_no_results(self, client):
         """Test search with no results."""
-        request_data = {
-            "query": "nonexistent"
-        }
+        request_data = {"query": "nonexistent"}
 
-        with patch('nora.api.server.ProjectIndexer') as MockIndexer:
+        with patch("nora.api.server.ProjectIndexer") as MockIndexer:
             mock_indexer = MockIndexer.return_value
             mock_indexer.search.return_value = []
 
@@ -320,29 +309,28 @@ class TestTeamEndpoint:
         """Test running a multi-agent team."""
         # Create team config file
         config_file = tmp_path / "team.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 name: test-team
 mode: sequential
 model: test-model
 agents:
   - name: agent1
     agent: test-agent
-""")
+"""
+        )
 
-        request_data = {
-            "config_path": str(config_file)
-        }
+        request_data = {"config_path": str(config_file)}
 
-        with patch('nora.api.server.load_team_config') as mock_load, \
-             patch('nora.api.server.Orchestrator') as MockOrchestrator:
+        with patch("nora.api.server.load_team_config") as mock_load, patch(
+            "nora.api.server.Orchestrator"
+        ) as MockOrchestrator:
 
             mock_load.return_value = {
                 "name": "test-team",
                 "mode": "sequential",
                 "model": "test-model",
-                "agents": [
-                    {"name": "agent1", "agent": "test-agent"}
-                ]
+                "agents": [{"name": "agent1", "agent": "test-agent"}],
             }
 
             mock_orchestrator = MockOrchestrator.return_value
@@ -362,7 +350,8 @@ agents:
     def test_run_team_parallel_mode(self, client, tmp_path):
         """Test running team in parallel mode."""
         config_file = tmp_path / "team.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 name: parallel-team
 mode: parallel
 agents:
@@ -370,28 +359,28 @@ agents:
     agent: test-agent
   - name: agent2
     agent: test-agent
-""")
+"""
+        )
 
-        request_data = {
-            "config_path": str(config_file)
-        }
+        request_data = {"config_path": str(config_file)}
 
-        with patch('nora.api.server.load_team_config') as mock_load, \
-             patch('nora.api.server.Orchestrator') as MockOrchestrator:
+        with patch("nora.api.server.load_team_config") as mock_load, patch(
+            "nora.api.server.Orchestrator"
+        ) as MockOrchestrator:
 
             mock_load.return_value = {
                 "name": "parallel-team",
                 "mode": "parallel",
                 "agents": [
                     {"name": "agent1", "agent": "test-agent"},
-                    {"name": "agent2", "agent": "test-agent"}
-                ]
+                    {"name": "agent2", "agent": "test-agent"},
+                ],
             }
 
             mock_orchestrator = MockOrchestrator.return_value
             mock_orchestrator.run_parallel.return_value = {
                 "agent1": {"success": True},
-                "agent2": {"success": True}
+                "agent2": {"success": True},
             }
 
             response = client.post("/team", json=request_data)
@@ -403,11 +392,9 @@ agents:
 
     def test_run_team_invalid_config(self, client):
         """Test running team with invalid config."""
-        request_data = {
-            "config_path": "/nonexistent/team.yaml"
-        }
+        request_data = {"config_path": "/nonexistent/team.yaml"}
 
-        with patch('nora.api.server.load_team_config') as mock_load:
+        with patch("nora.api.server.load_team_config") as mock_load:
             mock_load.side_effect = FileNotFoundError("Config not found")
 
             response = client.post("/team", json=request_data)
@@ -417,26 +404,29 @@ agents:
     def test_run_team_mode_override(self, client, tmp_path):
         """Test running team with mode override."""
         config_file = tmp_path / "team.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 name: test-team
 mode: sequential
 agents:
   - name: agent1
     agent: test-agent
-""")
+"""
+        )
 
         request_data = {
             "config_path": str(config_file),
-            "mode": "parallel"  # Override to parallel
+            "mode": "parallel",  # Override to parallel
         }
 
-        with patch('nora.api.server.load_team_config') as mock_load, \
-             patch('nora.api.server.Orchestrator') as MockOrchestrator:
+        with patch("nora.api.server.load_team_config") as mock_load, patch(
+            "nora.api.server.Orchestrator"
+        ) as MockOrchestrator:
 
             mock_load.return_value = {
                 "name": "test-team",
                 "mode": "sequential",
-                "agents": [{"name": "agent1", "agent": "test-agent"}]
+                "agents": [{"name": "agent1", "agent": "test-agent"}],
             }
 
             mock_orchestrator = MockOrchestrator.return_value
@@ -462,7 +452,7 @@ class TestAPIRequestValidation:
         response = client.post(
             "/agents/test-agent",
             data="invalid json",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         assert response.status_code == 422
@@ -490,9 +480,7 @@ class TestAPIErrorHandling:
 
         client = TestClient(api_server.app)
 
-        request_data = {
-            "messages": [{"role": "user", "content": "test"}]
-        }
+        request_data = {"messages": [{"role": "user", "content": "test"}]}
 
         response = client.post("/chat", json=request_data)
 
@@ -500,13 +488,13 @@ class TestAPIErrorHandling:
 
     def test_index_permission_error(self, client):
         """Test index endpoint with permission error."""
-        request_data = {
-            "project_path": "/restricted/path"
-        }
+        request_data = {"project_path": "/restricted/path"}
 
-        with patch('nora.api.server.ProjectIndexer') as MockIndexer:
+        with patch("nora.api.server.ProjectIndexer") as MockIndexer:
             mock_indexer = MockIndexer.return_value
-            mock_indexer.index_project.side_effect = PermissionError("Permission denied")
+            mock_indexer.index_project.side_effect = PermissionError(
+                "Permission denied"
+            )
 
             response = client.post("/projects/index", json=request_data)
 
@@ -520,9 +508,9 @@ class TestAPIServerCreation:
         """Test server creation."""
         from nora.api.server import create_server
 
-        with patch('nora.api.server.PluginLoader'), \
-             patch('nora.api.server.ProjectIndexer'), \
-             patch('nora.api.server.OllamaChat'):
+        with patch("nora.api.server.PluginLoader"), patch(
+            "nora.api.server.ProjectIndexer"
+        ), patch("nora.api.server.OllamaChat"):
 
             server = create_server(mock_config, host="127.0.0.1", port=9000)
 
@@ -531,7 +519,7 @@ class TestAPIServerCreation:
 
     def test_server_without_fastapi(self, mock_config):
         """Test server creation without FastAPI installed."""
-        with patch('nora.api.server.FASTAPI_AVAILABLE', False):
+        with patch("nora.api.server.FASTAPI_AVAILABLE", False):
             from nora.api.server import NoraAPIServer
 
             with pytest.raises(ImportError, match="FastAPI not installed"):

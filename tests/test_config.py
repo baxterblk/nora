@@ -1,11 +1,12 @@
 """Tests for NORA ConfigManager"""
 
-import tempfile
 import pathlib
-import pytest
-from unittest.mock import patch, Mock
+import tempfile
+from unittest.mock import Mock, patch
 
-from nora.core.config import ConfigManager, DEFAULT_CONFIG
+import pytest
+
+from nora.core.config import DEFAULT_CONFIG, ConfigManager
 
 
 class TestConfigManager:
@@ -25,6 +26,7 @@ class TestConfigManager:
 
         # Create a config file
         import yaml
+
         test_config = {"model": "test-model", "ollama": {"url": "http://test:11434"}}
         with open(config_path, "w") as f:
             yaml.safe_dump(test_config, f)
@@ -45,6 +47,7 @@ class TestConfigManager:
 
         # Reload and verify
         import yaml
+
         with open(config_path, "r") as f:
             loaded = yaml.safe_load(f)
 
@@ -92,6 +95,7 @@ class TestConfigManager:
 
         # Create a config with specific values
         import yaml
+
         test_config = {
             "model": "config-model",
             "ollama": {"url": "http://config:11434", "verify_ssl": False},
@@ -106,7 +110,10 @@ class TestConfigManager:
         assert manager.get_ollama_url() == "http://config:11434"
 
         # Test with env vars - should override config
-        with patch.dict('os.environ', {'NORA_MODEL': 'env-model', 'NORA_OLLAMA_URL': 'http://env:11434'}):
+        with patch.dict(
+            "os.environ",
+            {"NORA_MODEL": "env-model", "NORA_OLLAMA_URL": "http://env:11434"},
+        ):
             assert manager.get_model() == "env-model"
             assert manager.get_ollama_url() == "http://env:11434"
 
@@ -121,7 +128,7 @@ class TestConfigManager:
 
         manager.config["profiles"] = {
             "production": {"url": "http://prod:11434"},
-            "development": {"url": "http://dev:11434"}
+            "development": {"url": "http://dev:11434"},
         }
 
         profiles = manager.list_profiles()
@@ -150,7 +157,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="No such profile"):
             manager.use_profile("nonexistent")
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_test_connection_success(self, mock_get, tmp_path):
         """Test successful connection test"""
         config_path = tmp_path / "test_config.yaml"
@@ -165,7 +172,7 @@ class TestConfigManager:
         assert success is True
         assert result == {"version": "0.1.0"}
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_test_connection_failure(self, mock_get, tmp_path):
         """Test failed connection test"""
         config_path = tmp_path / "test_config.yaml"

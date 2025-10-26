@@ -1,7 +1,9 @@
 """Tests for NORA PluginLoader"""
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from nora.core.plugins import PluginLoader
 
 
@@ -50,7 +52,7 @@ class TestPluginLoader:
 
         # Create a valid plugin
         plugin_file = plugins_dir / "test_plugin.py"
-        plugin_content = '''
+        plugin_content = """
 def register():
     def run(model, call_fn):
         print("Test plugin running")
@@ -60,7 +62,7 @@ def register():
         "description": "A test plugin",
         "run": run
     }
-'''
+"""
         plugin_file.write_text(plugin_content)
 
         loader = PluginLoader(plugins_dir)
@@ -104,10 +106,10 @@ def register():
         plugins_dir.mkdir()
 
         plugin_file = plugins_dir / "invalid.py"
-        plugin_content = '''
+        plugin_content = """
 def register():
     return {"invalid": "structure"}
-'''
+"""
         plugin_file.write_text(plugin_content)
 
         loader = PluginLoader(plugins_dir)
@@ -123,7 +125,7 @@ def register():
         # Create two plugins
         for i in range(2):
             plugin_file = plugins_dir / f"plugin{i}.py"
-            plugin_content = f'''
+            plugin_content = f"""
 def register():
     def run(model, call_fn):
         pass
@@ -133,7 +135,7 @@ def register():
         "description": "Plugin {i}",
         "run": run
     }}
-'''
+"""
             plugin_file.write_text(plugin_content)
 
         loader = PluginLoader(plugins_dir)
@@ -149,7 +151,7 @@ def register():
         plugins_dir.mkdir()
 
         plugin_file = plugins_dir / "test.py"
-        plugin_content = '''
+        plugin_content = """
 def register():
     def run(model, call_fn):
         pass
@@ -159,7 +161,7 @@ def register():
         "description": "Test",
         "run": run
     }
-'''
+"""
         plugin_file.write_text(plugin_content)
 
         loader = PluginLoader(plugins_dir)
@@ -191,7 +193,7 @@ def register():
         called = []
 
         plugin_file = plugins_dir / "test.py"
-        plugin_content = '''
+        plugin_content = """
 def register():
     def run(model, call_fn):
         # Plugin execution logic
@@ -202,7 +204,7 @@ def register():
         "description": "Test",
         "run": run
     }
-'''
+"""
         plugin_file.write_text(plugin_content)
 
         loader = PluginLoader(plugins_dir)

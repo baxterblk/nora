@@ -6,11 +6,12 @@ Interactive configuration wizard for first-time NORA users.
 
 import logging
 import os
-from typing import Dict, Any, Optional
-import requests
+from typing import Any, Dict, Optional
 
-from .config import ConfigManager, DEFAULT_CONFIG
+import requests  # type: ignore
+
 from . import utils
+from .config import DEFAULT_CONFIG, ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,10 @@ def first_run_wizard() -> Dict[str, Any]:
         utils.info(f"Testing connection to {test_url}...")
         success, response = check_ollama_connection(test_url)
 
-        if success:
-            utils.success(f"✓ Connected! Ollama version: {response.get('version', 'unknown')}")
+        if success and response:
+            utils.success(
+                f"✓ Connected! Ollama version: {response.get('version', 'unknown')}"
+            )
             url = test_url
         else:
             utils.error("✗ Connection failed!")
@@ -89,7 +92,7 @@ def first_run_wizard() -> Dict[str, Any]:
             print("  - Wrong URL or port")
             print("  - Firewall blocking connection")
             retry = input("\nRetry? [Y/n]: ").strip().lower()
-            if retry == 'n':
+            if retry == "n":
                 utils.warning("Using default URL anyway. You can change it later with:")
                 utils.info("  nora config set ollama.url <your-url>")
                 url = test_url
@@ -136,7 +139,7 @@ def first_run_wizard() -> Dict[str, Any]:
     print("Setup complete! 🎉")
     print("\nGet started:")
     print("  nora chat              # Start an interactive chat")
-    print("  nora run \"<prompt>\"    # Run a one-shot prompt")
+    print('  nora run "<prompt>"    # Run a one-shot prompt')
     print("  nora agents            # List available agents")
     print("=" * 70 + "\n")
 

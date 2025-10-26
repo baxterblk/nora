@@ -1,0 +1,15 @@
+{
+  "name": "delete_file",
+  "description": "Deletes a file.",
+  "entrypoint": "main.py",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "The path to the file to delete.",
+        "required": true
+      }
+    }
+  }
+}

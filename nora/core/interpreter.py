@@ -8,8 +8,8 @@ Supports multiple formats for specifying file paths and content.
 import json
 import logging
 import re
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FileAction:
     """Represents a file operation extracted from model output."""
+
     action_type: str  # 'create', 'append', 'read', 'delete'
     path: str
     content: Optional[str] = None
@@ -26,6 +27,7 @@ class FileAction:
 @dataclass
 class CommandAction:
     """Represents a command execution request."""
+
     command: str
     cwd: Optional[str] = None
 
@@ -34,28 +36,16 @@ class ActionInterpreter:
     """Interprets model output and extracts file/command actions."""
 
     # Pattern: # File: path/to/file.ext
-    HEADER_PATTERN = re.compile(
-        r'^#\s*File:\s*(.+?)$',
-        re.MULTILINE | re.IGNORECASE
-    )
+    HEADER_PATTERN = re.compile(r"^#\s*File:\s*(.+?)$", re.MULTILINE | re.IGNORECASE)
 
     # Pattern: ```language path/to/file.ext
-    FENCED_WITH_PATH = re.compile(
-        r'```(\w+)?\s+(.+?)\n(.*?)```',
-        re.DOTALL
-    )
+    FENCED_WITH_PATH = re.compile(r"```(\w+)?\s+(.+?)\n(.*?)```", re.DOTALL)
 
     # Pattern: standard code fences with File: header before
-    FENCED_CODE = re.compile(
-        r'```(\w+)?\n(.*?)```',
-        re.DOTALL
-    )
+    FENCED_CODE = re.compile(r"```(\w+)?\n(.*?)```", re.DOTALL)
 
     # Pattern: <NORA_ACTION>JSON</NORA_ACTION>
-    JSON_ACTION = re.compile(
-        r'<NORA_ACTION>(.*?)</NORA_ACTION>',
-        re.DOTALL
-    )
+    JSON_ACTION = re.compile(r"<NORA_ACTION>(.*?)</NORA_ACTION>", re.DOTALL)
 
     def __init__(self) -> None:
         """Initialize the action interpreter."""
@@ -116,12 +106,14 @@ class ActionInterpreter:
                 language = data.get("language")
 
                 if path:
-                    actions.append(FileAction(
-                        action_type=action_type,
-                        path=path,
-                        content=content,
-                        language=language
-                    ))
+                    actions.append(
+                        FileAction(
+                            action_type=action_type,
+                            path=path,
+                            content=content,
+                            language=language,
+                        )
+                    )
                     logger.debug(f"Extracted JSON action: {action_type} {path}")
 
             except json.JSONDecodeError as e:
@@ -153,13 +145,15 @@ class ActionInterpreter:
             content = match.group(3).strip()
 
             # Skip if path looks like just a language identifier
-            if path and not path.isalpha() and '/' in path or '.' in path:
-                actions.append(FileAction(
-                    action_type="create",
-                    path=path,
-                    content=content,
-                    language=language
-                ))
+            if path and not path.isalpha() and "/" in path or "." in path:
+                actions.append(
+                    FileAction(
+                        action_type="create",
+                        path=path,
+                        content=content,
+                        language=language,
+                    )
+                )
                 logger.debug(f"Extracted fenced block with path: {path}")
 
         return actions
@@ -183,7 +177,7 @@ class ActionInterpreter:
         actions: List[FileAction] = []
 
         # Split text into lines for processing
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         i = 0
         while i < len(lines):
@@ -203,28 +197,30 @@ class ActionInterpreter:
                     i += 1
 
                 # Check if next line starts a code block
-                if i < len(lines) and lines[i].strip().startswith('```'):
+                if i < len(lines) and lines[i].strip().startswith("```"):
                     # Extract language if present
                     lang_line = lines[i].strip()[3:].strip()
-                    language = lang_line if lang_line and not '/' in lang_line else None
+                    language = lang_line if lang_line and not "/" in lang_line else None
                     i += 1
 
                     # Collect code block content
                     while i < len(lines):
-                        if lines[i].strip().startswith('```'):
+                        if lines[i].strip().startswith("```"):
                             break
                         content_lines.append(lines[i])
                         i += 1
 
-                    content = '\n'.join(content_lines).strip()
+                    content = "\n".join(content_lines).strip()
 
                     if content:
-                        actions.append(FileAction(
-                            action_type="create",
-                            path=path,
-                            content=content,
-                            language=language
-                        ))
+                        actions.append(
+                            FileAction(
+                                action_type="create",
+                                path=path,
+                                content=content,
+                                language=language,
+                            )
+                        )
                         logger.debug(f"Extracted header-style action: {path}")
 
             i += 1
@@ -246,7 +242,7 @@ class ActionInterpreter:
         """
         commands: List[CommandAction] = []
 
-        pattern = re.compile(r'<NORA_COMMAND>(.*?)</NORA_COMMAND>', re.DOTALL)
+        pattern = re.compile(r"<NORA_COMMAND>(.*?)</NORA_COMMAND>", re.DOTALL)
 
         for match in pattern.finditer(text):
             command = match.group(1).strip()

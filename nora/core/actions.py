@@ -10,7 +10,7 @@ import os
 import pathlib
 import shutil
 import subprocess
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 class ActionsManager:
     """Manages safe file operations and command execution within project directory."""
 
-    def __init__(self, project_root: Optional[str] = None, safe_mode: bool = True) -> None:
+    def __init__(
+        self, project_root: Optional[str] = None, safe_mode: bool = True
+    ) -> None:
         """
         Initialize the actions manager.
 
@@ -72,10 +74,14 @@ class ActionsManager:
         if not path.exists():
             return True
 
-        response = input(f"File {path} already exists. Overwrite? (y/N): ").strip().lower()
+        response = (
+            input(f"File {path} already exists. Overwrite? (y/N): ").strip().lower()
+        )
         return response in ["y", "yes"]
 
-    def create_file(self, path: str, content: str, force: bool = False) -> Tuple[bool, str]:
+    def create_file(
+        self, path: str, content: str, force: bool = False
+    ) -> Tuple[bool, str]:
         """
         Create or overwrite a file with given content.
 
@@ -174,7 +180,9 @@ class ActionsManager:
             logger.error(f"Failed to append to file {path}: {e}")
             return False, f"Error: {e}"
 
-    def list_files(self, directory: str = ".", pattern: str = "*") -> Tuple[bool, List[str]]:
+    def list_files(
+        self, directory: str = ".", pattern: str = "*"
+    ) -> Tuple[bool, List[str]]:
         """
         List files in a directory.
 
@@ -253,7 +261,7 @@ class ActionsManager:
         command: str,
         cwd: Optional[str] = None,
         timeout: int = 30,
-        allow_dangerous: bool = False
+        allow_dangerous: bool = False,
     ) -> Tuple[bool, str]:
         """
         Run a shell command in the project directory.
@@ -291,7 +299,7 @@ class ActionsManager:
                 cwd=str(work_dir),
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout,
             )
 
             if result.returncode == 0:

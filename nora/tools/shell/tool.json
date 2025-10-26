@@ -1,0 +1,15 @@
+{
+  "name": "shell",
+  "description": "Executes a shell command.",
+  "entrypoint": "main.py",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "The command to execute.",
+        "required": true
+      }
+    }
+  }
+}

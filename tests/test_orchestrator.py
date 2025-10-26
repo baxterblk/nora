@@ -4,12 +4,15 @@ Tests for NORA Multi-Agent Orchestrator
 Tests SharedMemory, AgentTask, Orchestrator, and team execution modes.
 """
 
-import pytest
-import time
-import tempfile
 import pathlib
-from unittest.mock import Mock, MagicMock
-from nora.core.orchestrator import SharedMemory, AgentTask, Orchestrator, load_team_config
+import tempfile
+import time
+from unittest.mock import MagicMock, Mock
+
+import pytest
+
+from nora.core.orchestrator import (AgentTask, Orchestrator, SharedMemory,
+                                    load_team_config)
 
 
 class TestSharedMemory:
@@ -39,11 +42,7 @@ class TestSharedMemory:
         """Test atomic update operation."""
         memory = SharedMemory()
 
-        memory.update({
-            "key1": "value1",
-            "key2": "value2",
-            "key3": "value3"
-        })
+        memory.update({"key1": "value1", "key2": "value2", "key3": "value3"})
 
         assert memory.get("key1") == "value1"
         assert memory.get("key2") == "value2"
@@ -131,7 +130,7 @@ class TestAgentTask:
             agent_instance=agent,
             model="test-model",
             depends_on=["agent1", "agent2"],
-            config={"key": "value"}
+            config={"key": "value"},
         )
 
         assert task.agent_name == "test-agent"
@@ -147,9 +146,7 @@ class TestAgentTask:
         """Test AgentTask initialization with defaults."""
         agent = Mock()
         task = AgentTask(
-            agent_name="test-agent",
-            agent_instance=agent,
-            model="test-model"
+            agent_name="test-agent", agent_instance=agent, model="test-model"
         )
 
         assert task.depends_on == []
@@ -162,7 +159,7 @@ class TestAgentTask:
             agent_name="test-agent",
             agent_instance=agent,
             model="test-model",
-            depends_on=["dep1"]
+            depends_on=["dep1"],
         )
 
         repr_str = repr(task)
@@ -177,11 +174,7 @@ class TestOrchestrator:
     def test_init(self):
         """Test Orchestrator initialization."""
         call_fn = Mock()
-        orchestrator = Orchestrator(
-            model="test-model",
-            call_fn=call_fn,
-            max_workers=4
-        )
+        orchestrator = Orchestrator(model="test-model", call_fn=call_fn, max_workers=4)
 
         assert orchestrator.model == "test-model"
         assert orchestrator.call_fn == call_fn
@@ -194,16 +187,10 @@ class TestOrchestrator:
         orchestrator = Orchestrator(model="test-model", call_fn=call_fn)
 
         # Mock agent (legacy function-based)
-        agent = {
-            "name": "test-agent",
-            "type": "legacy-function",
-            "run": Mock()
-        }
+        agent = {"name": "test-agent", "type": "legacy-function", "run": Mock()}
 
         task = AgentTask(
-            agent_name="test-agent",
-            agent_instance=agent,
-            model="test-model"
+            agent_name="test-agent", agent_instance=agent, model="test-model"
         )
 
         results = orchestrator.run_sequential([task])
@@ -221,17 +208,11 @@ class TestOrchestrator:
         agents = []
         tasks = []
         for i in range(3):
-            agent = {
-                "name": f"agent-{i}",
-                "type": "legacy-function",
-                "run": Mock()
-            }
+            agent = {"name": f"agent-{i}", "type": "legacy-function", "run": Mock()}
             agents.append(agent)
 
             task = AgentTask(
-                agent_name=f"agent-{i}",
-                agent_instance=agent,
-                model="test-model"
+                agent_name=f"agent-{i}", agent_instance=agent, model="test-model"
             )
             tasks.append(task)
 
@@ -252,13 +233,11 @@ class TestOrchestrator:
         agent = {
             "name": "failing-agent",
             "type": "legacy-function",
-            "run": Mock(side_effect=RuntimeError("Agent failed"))
+            "run": Mock(side_effect=RuntimeError("Agent failed")),
         }
 
         task = AgentTask(
-            agent_name="failing-agent",
-            agent_instance=agent,
-            model="test-model"
+            agent_name="failing-agent", agent_instance=agent, model="test-model"
         )
 
         results = orchestrator.run_sequential([task])
@@ -279,7 +258,7 @@ class TestOrchestrator:
         mock_instance.run.return_value = {
             "success": True,
             "output": "Test output",
-            "context_updates": {"updated_key": "updated_value"}
+            "context_updates": {"updated_key": "updated_value"},
         }
         mock_instance.on_start = Mock()
         mock_instance.on_complete = Mock()
@@ -287,13 +266,11 @@ class TestOrchestrator:
         agent = {
             "name": "class-agent",
             "type": "class-based-agent",
-            "instance": mock_instance
+            "instance": mock_instance,
         }
 
         task = AgentTask(
-            agent_name="class-agent",
-            agent_instance=agent,
-            model="test-model"
+            agent_name="class-agent", agent_instance=agent, model="test-model"
         )
 
         results = orchestrator.run_sequential([task])
@@ -316,16 +293,10 @@ class TestOrchestrator:
         # Create multiple independent agents
         tasks = []
         for i in range(3):
-            agent = {
-                "name": f"agent-{i}",
-                "type": "legacy-function",
-                "run": Mock()
-            }
+            agent = {"name": f"agent-{i}", "type": "legacy-function", "run": Mock()}
 
             task = AgentTask(
-                agent_name=f"agent-{i}",
-                agent_instance=agent,
-                model="test-model"
+                agent_name=f"agent-{i}", agent_instance=agent, model="test-model"
             )
             tasks.append(task)
 
@@ -344,11 +315,7 @@ class TestOrchestrator:
         # Create agents with dependency chain: agent-0 -> agent-1 -> agent-2
         tasks = []
         for i in range(3):
-            agent = {
-                "name": f"agent-{i}",
-                "type": "legacy-function",
-                "run": Mock()
-            }
+            agent = {"name": f"agent-{i}", "type": "legacy-function", "run": Mock()}
 
             depends_on = [f"agent-{i-1}"] if i > 0 else []
 
@@ -356,7 +323,7 @@ class TestOrchestrator:
                 agent_name=f"agent-{i}",
                 agent_instance=agent,
                 model="test-model",
-                depends_on=depends_on
+                depends_on=depends_on,
             )
             tasks.append(task)
 
@@ -464,7 +431,7 @@ class TestOrchestratorIntegration:
         mock_instance_1.run.return_value = {
             "success": True,
             "output": "Agent 1 output",
-            "context_updates": {"shared_data": "from_agent_1"}
+            "context_updates": {"shared_data": "from_agent_1"},
         }
         mock_instance_1.on_start = Mock()
         mock_instance_1.on_complete = Mock()
@@ -472,7 +439,7 @@ class TestOrchestratorIntegration:
         agent_1 = {
             "name": "writer-agent",
             "type": "class-based-agent",
-            "instance": mock_instance_1
+            "instance": mock_instance_1,
         }
 
         # Second agent reads from shared memory
@@ -490,7 +457,7 @@ class TestOrchestratorIntegration:
         agent_2 = {
             "name": "reader-agent",
             "type": "class-based-agent",
-            "instance": mock_instance_2
+            "instance": mock_instance_2,
         }
 
         task_1 = AgentTask("writer-agent", agent_1, "test-model")

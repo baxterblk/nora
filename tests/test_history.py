@@ -1,6 +1,7 @@
 """Tests for NORA HistoryManager"""
 
 import json
+
 import pytest
 
 from nora.core.history import HistoryManager
@@ -32,7 +33,7 @@ class TestHistoryManager:
 
         test_history = [
             {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there!"}
+            {"role": "assistant", "content": "Hi there!"},
         ]
 
         manager.save(test_history)
@@ -96,10 +97,7 @@ class TestHistoryManager:
         history_path = tmp_path / "test_history.json"
         manager = HistoryManager(str(history_path))
 
-        history = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(5)
-        ]
+        history = [{"role": "user", "content": f"Message {i}"} for i in range(5)]
 
         recent = manager.get_recent(history, limit=10)
 
@@ -110,10 +108,7 @@ class TestHistoryManager:
         history_path = tmp_path / "test_history.json"
         manager = HistoryManager(str(history_path))
 
-        history = [
-            {"role": "user", "content": f"Message {i}"}
-            for i in range(20)
-        ]
+        history = [{"role": "user", "content": f"Message {i}"} for i in range(20)]
 
         recent = manager.get_recent(history, limit=10)
 

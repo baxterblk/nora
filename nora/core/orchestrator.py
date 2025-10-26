@@ -6,11 +6,11 @@ Supports both sequential and parallel execution modes.
 """
 
 import logging
-import threading
 import queue
+import threading
 import time
-from typing import Dict, Any, List, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,9 @@ class SharedMemory:
         with self._lock:
             return self._store.copy()
 
-    def post_message(self, sender: str, message: str, data: Optional[Dict[str, Any]] = None) -> None:
+    def post_message(
+        self, sender: str, message: str, data: Optional[Dict[str, Any]] = None
+    ) -> None:
         """
         Post a message for other agents to consume.
 
@@ -89,7 +91,7 @@ class SharedMemory:
             "sender": sender,
             "message": message,
             "data": data or {},
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
         self._message_queue.put(msg)
         logger.debug(f"Message posted by {sender}: {message}")
@@ -125,7 +127,7 @@ class AgentTask:
         agent_instance: Any,
         model: str,
         depends_on: Optional[List[str]] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize an agent task.
@@ -155,12 +157,7 @@ class Orchestrator:
     Multi-agent orchestrator with support for sequential and parallel execution.
     """
 
-    def __init__(
-        self,
-        model: str,
-        call_fn: Callable,
-        max_workers: int = 4
-    ):
+    def __init__(self, model: str, call_fn: Callable, max_workers: int = 4):
         """
         Initialize the orchestrator.
 
@@ -217,7 +214,7 @@ class Orchestrator:
 
             except Exception as e:
                 logger.error(f"Agent {task.agent_name} failed: {e}", exc_info=True)
-                task.error = str(e)
+                task.error = e
                 task.completed = True
                 results[task.agent_name] = {"success": False, "error": str(e)}
 
@@ -242,7 +239,8 @@ class Orchestrator:
             while pending_tasks:
                 # Find tasks ready to run (dependencies satisfied)
                 ready_tasks = [
-                    task for task in pending_tasks.values()
+                    task
+                    for task in pending_tasks.values()
                     if all(dep in completed for dep in task.depends_on)
                 ]
 
@@ -303,7 +301,9 @@ class Orchestrator:
             task.completed = True
             raise
 
-    def _execute_agent(self, task: AgentTask, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_agent(
+        self, task: AgentTask, context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Execute an agent with given context.
 
@@ -331,7 +331,7 @@ class Orchestrator:
                     context=context,
                     model=task.model,
                     call_fn=self.call_fn,
-                    tools=None  # TODO: Pass tools when tool system is ready
+                    tools=None,  # TODO: Pass tools when tool system is ready
                 )
                 instance.on_complete(result, context)
                 return result
@@ -380,8 +380,9 @@ def load_team_config(config_path: str) -> Dict[str, Any]:
             agent: test_generator
             depends_on: [reviewer]
     """
-    import yaml
     import pathlib
+
+    import yaml  # type: ignore
 
     path = pathlib.Path(config_path).expanduser()
     if not path.exists():

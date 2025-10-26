@@ -1,13 +1,14 @@
 """Tests for NORA CLI commands"""
 
-import tempfile
 import pathlib
-import pytest
-from unittest.mock import patch
+import tempfile
 from io import StringIO
+from unittest.mock import patch
+
+import pytest
 
 from nora.cli import config_command
-from nora.core.config import ConfigManager, DEFAULT_CONFIG
+from nora.core.config import DEFAULT_CONFIG, ConfigManager
 
 
 class TestConfigCommand:

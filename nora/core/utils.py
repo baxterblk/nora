@@ -12,6 +12,7 @@ from typing import Optional
 # ANSI color codes
 class Colors:
     """ANSI color codes for terminal output."""
+
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
@@ -91,13 +92,11 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
 
     # Create formatters
-    console_formatter = logging.Formatter(
-        '%(levelname)s: %(message)s'
-    )
+    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
 
     file_formatter = logging.Formatter(
-        '%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Configure root logger
@@ -122,10 +121,7 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
 
 
 def connection_banner(
-    url: str,
-    model: str,
-    status: str = "Connected",
-    endpoint: Optional[str] = None
+    url: str, model: str, status: str = "Connected", endpoint: Optional[str] = None
 ) -> None:
     """
     Display a connection status banner.
@@ -142,7 +138,7 @@ def connection_banner(
     banner_parts = [
         colored("NORA", Colors.CYAN, bold=True),
         colored(f"{status}", status_color, bold=True),
-        colored(f"{url}", Colors.WHITE)
+        colored(f"{url}", Colors.WHITE),
     ]
 
     if endpoint:

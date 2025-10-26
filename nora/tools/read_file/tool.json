@@ -1,0 +1,15 @@
+{
+  "name": "read_file",
+  "description": "Reads the content of a file.",
+  "entrypoint": "main.py",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "The path to the file to read.",
+        "required": true
+      }
+    }
+  }
+}

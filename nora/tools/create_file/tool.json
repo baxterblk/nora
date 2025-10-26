@@ -1,0 +1,20 @@
+{
+  "name": "create_file",
+  "description": "Creates a new file with the given content.",
+  "entrypoint": "main.py",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "The path to the file to create.",
+        "required": true
+      },
+      "content": {
+        "type": "string",
+        "description": "The content to write to the file.",
+        "required": true
+      }
+    }
+  }
+}

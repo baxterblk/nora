@@ -8,8 +8,9 @@ Supports both modern /api/chat and legacy /api/generate endpoints.
 import json
 import logging
 import pathlib
-from typing import List, Dict, Any, Optional
-import requests
+from typing import Any, Dict, List, Optional
+
+import requests  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,10 @@ class OllamaChat:
 
     # Candidate endpoints to probe during auto-detection
     ENDPOINT_CANDIDATES = [
-        "/api/chat",           # Native Ollama v0.3.9+
-        "/api/generate",       # Native Ollama < v0.3.9
-        "/api/v1/generate",    # Open-WebUI
-        "/v1/chat/completions" # OpenAI-compatible proxies
+        "/api/chat",  # Native Ollama v0.3.9+
+        "/api/generate",  # Native Ollama < v0.3.9
+        "/api/v1/generate",  # Open-WebUI
+        "/v1/chat/completions",  # OpenAI-compatible proxies
     ]
 
     def __init__(
@@ -32,7 +33,7 @@ class OllamaChat:
         base_url: str,
         model: str,
         compatibility_mode: str = "chat",
-        endpoint: Optional[str] = None
+        endpoint: Optional[str] = None,
     ) -> None:
         """
         Initialize the Ollama chat client.
@@ -84,15 +85,11 @@ class OllamaChat:
                     payload = {
                         "model": self.model,
                         "messages": [{"role": "user", "content": "test"}],
-                        "stream": False
+                        "stream": False,
                     }
                 else:
                     # Generate-style endpoints expect prompt string
-                    payload = {
-                        "model": self.model,
-                        "prompt": "test",
-                        "stream": False
-                    }
+                    payload = {"model": self.model, "prompt": "test", "stream": False}
 
                 # Send test request with timeout
                 # Increased to 30s to handle slow Ollama servers
@@ -103,10 +100,14 @@ class OllamaChat:
                 # Any other status (even errors like 400/500) means endpoint exists
                 if r.status_code != 404:
                     self._detected_endpoint = candidate
-                    logger.info(f"Detected endpoint: {candidate} (status: {r.status_code})")
+                    logger.info(
+                        f"Detected endpoint: {candidate} (status: {r.status_code})"
+                    )
                     return candidate
                 else:
-                    logger.debug(f"Endpoint {candidate} returned 404, trying next candidate")
+                    logger.debug(
+                        f"Endpoint {candidate} returned 404, trying next candidate"
+                    )
 
             except requests.RequestException as e:
                 logger.debug(f"Endpoint {candidate} failed: {e}")
@@ -137,7 +138,7 @@ class OllamaChat:
         self,
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
-        stream: bool = False
+        stream: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         Send a chat request to Ollama API with automatic endpoint detection.
@@ -148,10 +149,8 @@ class OllamaChat:
             stream: Whether to stream the response
 
         Returns:
-            Response dictionary for non-streaming, None for streaming
-
-        Raises:
-            requests.RequestException: If the API request fails
+            Response dictionary. For streaming mode, this contains the
+            accumulated response after the stream is complete.
         """
         model = model or self.model
 
@@ -171,7 +170,7 @@ class OllamaChat:
         messages: List[Dict[str, str]],
         model: str,
         stream: bool,
-        endpoint_path: str
+        endpoint_path: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Use chat-style endpoint (Ollama /api/chat or OpenAI-compatible).
@@ -183,7 +182,7 @@ class OllamaChat:
             endpoint_path: The endpoint path to use
 
         Returns:
-            Response dictionary for non-streaming, None for streaming
+            Response dictionary.
         """
         url = f"{self.base_url}{endpoint_path}"
         payload = {"model": model, "messages": messages, "stream": stream}
@@ -210,19 +209,11 @@ class OllamaChat:
         messages: List[Dict[str, str]],
         model: str,
         stream: bool,
-        endpoint_path: str
+        endpoint_path: str,
     ) -> Optional[Dict[str, Any]]:
         """
-        Use generate-style endpoint (Ollama /api/generate or Open-WebUI /api/v1/generate).
-
-        Args:
-            messages: List of message dictionaries
-            model: Model to use
-            stream: Whether to stream
-            endpoint_path: The endpoint path to use
-
         Returns:
-            Response dictionary for non-streaming, None for streaming
+            Response dictionary.
         """
         url = f"{self.base_url}{endpoint_path}"
 
@@ -314,6 +305,32 @@ class OllamaChat:
                 continue
 
         return "".join(accumulated)
+
+    def summarize(self, text: str, model: str = "llama3:8b") -> Optional[str]:
+        """
+        Summarize a given text using the Ollama API.
+
+        Args:
+            text: The text to summarize.
+            model: The model to use for summarization.
+
+        Returns:
+            The summarized text or None if summarization fails.
+        """
+        messages = [
+            {"role": "system", "content": "Summarize the following text:"},
+            {"role": "user", "content": text},
+        ]
+        try:
+            response = self.chat(messages, model=model, stream=False)
+            if response and "message" in response:
+                return response["message"]["content"]
+            elif response and "response" in response:
+                return response["response"]
+            return None
+        except Exception as e:
+            logger.error(f"Summarization failed: {e}")
+            return None
 
 
 def load_file_context(paths: Optional[List[str]]) -> str:
