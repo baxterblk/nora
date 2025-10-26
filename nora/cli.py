@@ -21,7 +21,7 @@ from typing import List, Optional
 
 import argcomplete
 
-from . import utils
+from .core import utils
 from .core.actions import ActionsManager
 from .core.chat import OllamaChat, load_file_context
 from .core.config import ConfigManager, DEFAULT_CONFIG
