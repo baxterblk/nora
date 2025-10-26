@@ -1,5 +1,5 @@
 ## DISCLAIMER
-NORA is in active beta development. While core features are stable and well-tested (100% test pass rate), expect ongoing improvements and occasional breaking changes. Use in production environments at your own discretion.
+This project is driven by a human and developed entirely by AI coding agents, Claude Code CLI and Google Gemini CLI. NORA is in active beta development. While core features are stable and well-tested (100% test pass rate), expect ongoing improvements and occasional breaking changes. Use in production environments at your own discretion.
 
 # NORA - No Rush (on) Anything
 
