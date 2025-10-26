@@ -62,6 +62,18 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+### Uninstallation
+
+To remove NORA from your system:
+
+```bash
+# If you installed with pipx
+pipx uninstall nora-cli
+
+# If you installed with pip
+pip uninstall nora-cli
+```
+
 ### First Run
 
 NORA will automatically run an interactive setup wizard on your first command:
