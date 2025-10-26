@@ -8,7 +8,7 @@ Supports both modern /api/chat and legacy /api/generate endpoints.
 import json
 import logging
 import pathlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Generator
 
 import requests  # type: ignore
 
@@ -139,7 +139,7 @@ class OllamaChat:
         messages: List[Dict[str, str]],
         model: Optional[str] = None,
         stream: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Union[Optional[Dict[str, Any]], Generator[str, None, None]]:
         """
         Send a chat request to Ollama API with automatic endpoint detection.
 
@@ -171,7 +171,7 @@ class OllamaChat:
         model: str,
         stream: bool,
         endpoint_path: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Union[Optional[Dict[str, Any]], Generator[str, None, None]]:
         """
         Use chat-style endpoint (Ollama /api/chat or OpenAI-compatible).
 
@@ -193,8 +193,7 @@ class OllamaChat:
             resp.raise_for_status()
 
             if stream:
-                accumulated = self._handle_stream_chat(resp)
-                return {"message": {"content": accumulated}}
+                return self._handle_stream_chat(resp)
             else:
                 data = resp.json()
                 # Handle both Ollama and OpenAI-style responses
@@ -210,7 +209,7 @@ class OllamaChat:
         model: str,
         stream: bool,
         endpoint_path: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Union[Optional[Dict[str, Any]], Generator[str, None, None]]:
         """
         Returns:
             Response dictionary.
@@ -239,24 +238,22 @@ class OllamaChat:
             resp.raise_for_status()
 
             if stream:
-                accumulated = self._handle_stream_generate(resp)
-                return {"response": accumulated}
+                return self._handle_stream_generate(resp)
             else:
                 data = resp.json()
                 print(data["response"])
                 return data
 
-    def _handle_stream_chat(self, response: requests.Response) -> str:
+    def _handle_stream_chat(self, response: requests.Response) -> Generator[str, None, None]:
         """
         Handle streaming response from /api/chat endpoint.
 
         Args:
             response: Streaming HTTP response
 
-        Returns:
-            Accumulated response text
+        Yields:
+            Response chunks
         """
-        accumulated = []
         for line in response.iter_lines():
             if not line:
                 continue
@@ -265,28 +262,23 @@ class OllamaChat:
                 data = json.loads(line.decode("utf-8"))
                 delta = data.get("message", {}).get("content", "")
                 if delta:
-                    print(delta, end="", flush=True)
-                    accumulated.append(delta)
+                    yield delta
                 if data.get("done"):
-                    print()
                     break
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to decode streaming response: {e}")
                 continue
 
-        return "".join(accumulated)
-
-    def _handle_stream_generate(self, response: requests.Response) -> str:
+    def _handle_stream_generate(self, response: requests.Response) -> Generator[str, None, None]:
         """
         Handle streaming response from /api/generate endpoint.
 
         Args:
             response: Streaming HTTP response
 
-        Returns:
-            Accumulated response text
+        Yields:
+            Response chunks
         """
-        accumulated = []
         for line in response.iter_lines():
             if not line:
                 continue
@@ -295,16 +287,12 @@ class OllamaChat:
                 data = json.loads(line.decode("utf-8"))
                 delta = data.get("response", "")
                 if delta:
-                    print(delta, end="", flush=True)
-                    accumulated.append(delta)
+                    yield delta
                 if data.get("done"):
-                    print()
                     break
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to decode streaming response: {e}")
                 continue
-
-        return "".join(accumulated)
 
     def summarize(self, text: str, model: str = "llama3:8b") -> Optional[str]:
         """

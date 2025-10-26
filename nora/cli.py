@@ -10,6 +10,7 @@ Enhanced with:
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import pathlib
@@ -20,7 +21,7 @@ from typing import List, Optional
 
 import argcomplete
 
-from .core import utils
+from . import utils
 from .core.actions import ActionsManager
 from .core.chat import OllamaChat, load_file_context
 from .core.config import ConfigManager, DEFAULT_CONFIG
@@ -31,6 +32,7 @@ from .core.plugins import PluginLoader
 from .core.setup import first_run_wizard, should_run_wizard
 from .core.tool_interpreter import ToolInterpreter
 from .core.tools import ToolRegistry
+from .tui import run_chat_ui
 
 logger = logging.getLogger(__name__)
 
@@ -50,298 +52,7 @@ def normalize_endpoint(endpoint: Optional[str]) -> Optional[str]:
     return endpoint
 
 
-def setup_readline_completion():
-    """Sets up readline completion for / commands."""
-    commands = ["/exit", "/clear"]
 
-    def completer(text, state):
-        line = readline.get_line_buffer()
-
-        if line.startswith("/"):
-            options = [cmd for cmd in commands if cmd.startswith(text)]
-            if state < len(options):
-                return options[state]
-            else:
-                return None
-        return None
-
-    readline.set_completer(completer)
-    readline.parse_and_bind("tab: complete")
-
-
-def chat_loop(
-    config: ConfigManager,
-    history_manager: HistoryManager,
-    model: Optional[str] = None,
-    context_files: Optional[List[str]] = None,
-    system: Optional[str] = None,
-    enable_actions: bool = False,
-    safe_mode: bool = True,
-    enable_tools: bool = False,
-    auto_context: bool = False,
-) -> None:
-    """
-    Run an interactive chat REPL with optional file actions support.
-
-    Args:
-        config: Configuration manager instance
-        history_manager: History manager instance
-        model: Model name (defaults to config)
-        context_files: List of file paths for context injection
-        system: System prompt
-        enable_actions: If True, execute file operations from model output
-        safe_mode: If True, prompt before overwriting files (ignored if enable_actions=False)
-    """
-    setup_readline_completion()
-    model = model or config.get_model()
-    ollama_url = config.get_ollama_url()
-
-    # Get compatibility mode and endpoint (default to "chat" and None for auto-detect)
-    compatibility_mode = config.get("ollama.compatibility", "chat")
-    endpoint = normalize_endpoint(config.get("ollama.endpoint", None))
-
-    # Initialize chat client
-    chat_client = OllamaChat(
-        ollama_url, model, compatibility_mode=compatibility_mode, endpoint=endpoint
-    )
-
-    # Trigger endpoint detection if not manually set
-    if not endpoint:
-        detected = chat_client.get_endpoint()
-        if detected and detected != endpoint:
-            config.set("ollama.endpoint", detected)
-            logger.info(f"Auto-detected and saved endpoint: {detected}")
-
-    # Show connection banner with detected endpoint
-    utils.connection_banner(ollama_url, model, endpoint=chat_client.get_endpoint())
-
-    # Load history
-    history = history_manager.load()
-
-    # Initialize tool system if enabled
-    tool_registry: Optional[ToolRegistry] = None
-    tool_interpreter: Optional[ToolInterpreter] = None
-    if enable_tools:
-        tool_registry = ToolRegistry()
-        tool_interpreter = ToolInterpreter(tool_registry)
-        utils.info("Tools enabled")
-
-    # Initialize actions system if enabled
-    actions_manager: Optional[ActionsManager] = None
-    interpreter: Optional[ActionInterpreter] = None
-
-    if enable_actions:
-        import os
-
-        actions_manager = ActionsManager(project_root=os.getcwd(), safe_mode=safe_mode)
-        interpreter = ActionInterpreter()
-        utils.info(f"Actions enabled (safe_mode={'on' if safe_mode else 'off'})")
-        logger.info(f"ActionsManager initialized at {os.getcwd()}")
-
-    # Initialize Project Indexer for auto-context
-    indexer: Optional[ProjectIndexer] = None
-    if auto_context:
-        utils.info("Auto-context is enabled. Indexing current directory...")
-        try:
-            indexer = ProjectIndexer()
-            indexer.index_project(".")
-            utils.info(f"Indexed {indexer.get_index_stats()['total_files']} files.")
-        except Exception as e:
-            utils.error(f"Auto-context failed during indexing: {e}")
-
-    # Load file context if provided
-    file_context = ""
-    if context_files:
-        file_context = load_file_context(context_files)
-        if file_context:
-            system = (
-                (system or "")
-                + "\n\nYou have access to the following files:\n"
-                + file_context
-            )
-            utils.info(f"Loaded context from {len(context_files)} file(s)")
-
-    # Add actions system prompt if actions are enabled
-    if enable_actions and interpreter:
-        actions_prompt = interpreter.format_system_prompt()
-        system = (system or "") + "\n\n" + actions_prompt
-
-    print(
-        f"\nType {utils.colored('/exit', utils.Colors.CYAN)} to quit, {utils.colored('/clear', utils.Colors.CYAN)} to reset history.\n"
-    )
-
-    while True:
-        try:
-            prompt = input(utils.colored("│ ", utils.Colors.CYAN, bold=True))
-        except (EOFError, KeyboardInterrupt):
-            print("\nExiting…")
-            break
-
-        cmd = prompt.strip().lower()
-        if cmd in ["/exit", "exit", "quit"]:
-            break
-
-        if cmd == "/clear":
-            history_manager.clear()
-            history = []
-            utils.success("History cleared")
-            continue
-
-        if auto_context and indexer:
-            try:
-                results = indexer.search(prompt, max_results=3)
-                if results:
-                    context_files = [result["path"] for result in results]
-                    file_context = load_file_context(context_files)
-                    if file_context:
-                        system = (
-                            (system or "")
-                            + "\n\nYou have access to the following files:\n"
-                            + file_context
-                        )
-                        utils.info(f"Loaded context from {len(context_files)} file(s)")
-            except Exception as e:
-                utils.error(f"Auto-context failed during search: {e}")
-
-        # Summarize history if it gets too long
-        history_summary_threshold = config.get("history_summary_threshold", 20)
-        if len(history) > history_summary_threshold:
-            utils.info("History is long, summarizing...")
-            try:
-                history_text = "\n".join([m["content"] for m in history])
-                summary = chat_client.summarize(history_text)
-                if summary:
-                    history_manager.clear()
-                    history = []
-                    history = history_manager.add_message(
-                        history,
-                        "system",
-                        f"This is a summary of the previous conversation:\n{summary}",
-                    )
-                    utils.success("History summarized.")
-                else:
-                    utils.warning("History summarization failed.")
-            except Exception as e:
-                utils.error(f"History summarization failed: {e}")
-
-        # Build messages for API
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-
-        # Add recent history (last 10 messages)
-        for m in history_manager.get_recent(history, limit=10):
-            messages.append(m)
-
-        messages.append({"role": "user", "content": prompt})
-
-        # Send chat request
-        try:
-            response = chat_client.chat(messages, model=model, stream=True)
-
-            # Extract response content
-            response_text = ""
-            if response:
-                if "message" in response:
-                    response_text = response["message"]["content"]
-                elif "response" in response:
-                    response_text = response["response"]
-
-            # Update history
-            history = history_manager.add_message(history, "user", prompt)
-            history = history_manager.add_message(
-                history, "assistant", response_text or "[streamed above]"
-            )
-            print()
-
-            # Process tool calls if enabled
-            if enable_tools and tool_interpreter and response_text:
-                tool_calls = tool_interpreter.extract_tool_calls(response_text)
-                for tool_call in tool_calls:
-                    utils.info(f"Executing tool: {tool_call.tool_name}")
-                    try:
-                        if tool_registry:
-                            result = tool_registry.run_tool(
-                                tool_call.tool_name, tool_call.parameters
-                            )
-                        history = history_manager.add_message(
-                            history,
-                            "tool",
-                            json.dumps(
-                                {"tool_name": tool_call.tool_name, "result": result}
-                            ),
-                        )
-                        utils.success(
-                            f"Tool {tool_call.tool_name} executed successfully."
-                        )
-                    except Exception as e:
-                        utils.error(f"Tool {tool_call.tool_name} failed: {e}")
-                        history = history_manager.add_message(
-                            history,
-                            "tool",
-                            json.dumps(
-                                {"tool_name": tool_call.tool_name, "error": str(e)}
-                            ),
-                        )
-
-            # Process actions if enabled
-            if enable_actions and interpreter and actions_manager and response_text:
-                file_actions = interpreter.extract_actions(response_text)
-                command_actions = interpreter.extract_commands(response_text)
-
-                # Execute file actions
-                for action in file_actions:
-                    if action.action_type == "create" and action.content:
-                        success, msg = actions_manager.create_file(
-                            action.path, action.content
-                        )
-                        if success:
-                            utils.success(msg)
-                        else:
-                            utils.error(msg)
-
-                    elif action.action_type == "append" and action.content:
-                        success, msg = actions_manager.append_file(
-                            action.path, action.content
-                        )
-                        if success:
-                            utils.info(f"✏️  {msg}")
-                        else:
-                            utils.error(msg)
-
-                    elif action.action_type == "read":
-                        success, content = actions_manager.read_file(action.path)
-                        if success:
-                            utils.info(f"📖 Read: {action.path} ({len(content)} chars)")
-                        else:
-                            utils.error(content)
-
-                    elif action.action_type == "delete":
-                        success, msg = actions_manager.delete_file(action.path)
-                        if success:
-                            utils.info(f"🗑️  {msg}")
-                        else:
-                            utils.error(msg)
-
-                # Execute command actions
-                for cmd_action in command_actions:
-                    utils.info(f"⚙️  Running: {cmd_action.command}")
-                    success, output = actions_manager.run_command(
-                        cmd_action.command, cwd=cmd_action.cwd
-                    )
-                    if success:
-                        utils.success(f"Command succeeded: {cmd_action.command}")
-                        if output.strip():
-                            print(output)
-                    else:
-                        utils.error(f"Command failed: {output}")
-
-        except requests.exceptions.ConnectionError as e:
-            utils.error(f"Connection to Ollama failed: {e}")
-            logger.exception("Ollama connection failed")
-        except Exception as e:
-            utils.error(f"An unexpected error occurred: {e}")
-            logger.exception("An unexpected error occurred in chat_loop")
 
 
 def run_one_shot(
@@ -889,16 +600,18 @@ def main() -> None:
 
     # Route commands
     if args.cmd == "chat":
-        chat_loop(
-            config,
-            history_manager,
-            model=args.model,
-            context_files=args.context,
-            system=args.system,
-            enable_actions=args.enable_actions,
-            safe_mode=not args.no_confirm,
-            enable_tools=args.enable_tools,
-            auto_context=args.auto_context,
+        asyncio.run(
+            run_chat_ui(
+                config,
+                history_manager,
+                model=args.model,
+                context_files=args.context,
+                system=args.system,
+                enable_actions=args.enable_actions,
+                safe_mode=not args.no_confirm,
+                enable_tools=args.enable_tools,
+                auto_context=args.auto_context,
+            )
         )
 
     elif args.cmd == "run":

@@ -36,6 +36,8 @@ dependencies = [
     "faiss-cpu>=1.7.4",
     "sentence-transformers>=2.2.2",
     "argcomplete>=3.1.1",
+    "rich",
+    "prompt_toolkit",
 ]
 
 [project.optional-dependencies]
