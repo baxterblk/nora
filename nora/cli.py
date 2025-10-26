@@ -50,6 +50,25 @@ def normalize_endpoint(endpoint: Optional[str]) -> Optional[str]:
     return endpoint
 
 
+def setup_readline_completion():
+    """Sets up readline completion for / commands."""
+    commands = ["/exit", "/clear"]
+
+    def completer(text, state):
+        line = readline.get_line_buffer()
+
+        if line.startswith("/"):
+            options = [cmd for cmd in commands if cmd.startswith(text)]
+            if state < len(options):
+                return options[state]
+            else:
+                return None
+        return None
+
+    readline.set_completer(completer)
+    readline.parse_and_bind("tab: complete")
+
+
 def chat_loop(
     config: ConfigManager,
     history_manager: HistoryManager,
@@ -73,6 +92,7 @@ def chat_loop(
         enable_actions: If True, execute file operations from model output
         safe_mode: If True, prompt before overwriting files (ignored if enable_actions=False)
     """
+    setup_readline_completion()
     model = model or config.get_model()
     ollama_url = config.get_ollama_url()
 
@@ -152,7 +172,7 @@ def chat_loop(
 
     while True:
         try:
-            prompt = input(utils.colored("You> ", utils.Colors.BRIGHT_BLUE, bold=True))
+            prompt = input(utils.colored("│ ", utils.Colors.CYAN, bold=True))
         except (EOFError, KeyboardInterrupt):
             print("\nExiting…")
             break
