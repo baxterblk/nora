@@ -97,9 +97,8 @@ nora agent greeter
 # Run a multi-agent team (v0.4.0)
 nora agent --team team-config.yaml
 
-# Index a project for context-aware search (v0.4.0)
-nora project index /path/to/project
-nora project search "keyword"
+# Index a project and search within it (v0.4.0)
+nora project index /path/to/project --search "keyword"
 
 # Start REST API server (v0.4.0)
 nora serve
@@ -121,6 +120,7 @@ nora config reset        # Reset to default configuration
 ### Developer Resources
 - **[Architecture Overview](docs/Overview.md)** - System design, CLI flow, and core components (v0.4.0 updated)
 - **[Contributing Guide](docs/Contributing.md)** - Development workflow, testing, and coding standards
+- **[Tools Guide](docs/Tools.md)** - Using and creating tools for agents
 - **[Roadmap](ROADMAP.md)** - Future features and version timeline
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 
@@ -137,6 +137,7 @@ nora config reset        # Reset to default configuration
 - **🔍 Project Indexing** *(v0.4.0)*: Index and search codebases across 20+ languages
 - **🌐 REST API** *(v0.4.0)*: FastAPI server with 6 endpoints for remote access
 - **🤖 Agent Plugins**: Extensible plugin system with Agent/Tool base classes
+- **🛠️ Extensible Tools**: A flexible tool system that allows agents to interact with the local environment (e.g., file system, shell commands).
 - **💬 Interactive Chat**: REPL with streaming responses and history
 - **📁 Code Context**: Inject file contents for code-aware conversations
 - **🎨 Colored Output**: ANSI-based terminal colors for enhanced UX
