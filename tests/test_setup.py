@@ -164,7 +164,7 @@ class TestSetupWizard:
         # Mock user inputs (custom values)
         mock_input.side_effect = [
             "http://custom:11434",  # Custom URL
-            "custom-model:1b",  # Custom model
+            "2",  # Select second model
         ]
 
         # Run wizard
@@ -172,7 +172,7 @@ class TestSetupWizard:
 
         # Verify configuration
         assert config["ollama"]["url"] == "http://custom:11434"
-        assert config["model"] == "custom-model:1b"
+        assert config["model"] == "deepseek-coder:6.7b"
 
     @patch("nora.core.setup.check_ollama_connection")
     @patch("nora.core.setup.get_available_models")

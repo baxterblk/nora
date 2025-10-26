@@ -111,13 +111,27 @@ def first_run_wizard() -> Dict[str, Any]:
         print(f"  ollama pull {DEFAULT_CONFIG['model']}")
         model = DEFAULT_CONFIG["model"]
     else:
-        utils.success(f"✓ Found {len(models)} model(s): {', '.join(models[:3])}")
-        if len(models) > 3:
-            print(f"  ...and {len(models) - 3} more")
+        utils.success(f"✓ Found {len(models)} model(s):")
+        for i, model_name in enumerate(models, 1):
+            print(f"  {i}. {model_name}")
 
-        print(f"\nRecommended model: {models[0]}")
-        user_model = input(f"Model [{models[0]}]: ").strip()
-        model = user_model or models[0]
+        while True:
+            try:
+                selection = input(f"\nSelect a model (1-{len(models)}) [1]: ").strip()
+                if not selection:
+                    model = models[0]
+                    break
+
+                selection_index = int(selection) - 1
+                if 0 <= selection_index < len(models):
+                    model = models[selection_index]
+                    break
+                else:
+                    utils.error(
+                        f"Invalid selection. Please enter a number between 1 and {len(models)}."
+                    )
+            except ValueError:
+                utils.error("Invalid input. Please enter a number.")
 
     # Step 3: Create configuration
     config = {
